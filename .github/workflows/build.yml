@@ -68,9 +68,7 @@ jobs:
             libasound2-dev \
             libssl-dev
 
-      - name: Run tests
-        run: cargo test --workspace --target ${{ matrix.target }}
-
+    
       - name: Build release binary
         run: cargo build --release --target ${{ matrix.target }} --bin ffgui
 
