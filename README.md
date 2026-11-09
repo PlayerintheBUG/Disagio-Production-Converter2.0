@@ -122,9 +122,3 @@ Il tab Batch implementa l'algoritmo intelligente di conversione e archiviazione:
 - Percorsi personalizzati per i binari di `ffmpeg` e `ffprobe`.
 
 ---
-
-## 🧪 Esecuzione dei Test Unitari
-Tutti i test del catalogo, validazione delle regole, builder deterministico, scansione e pianificazione batch, synthetic encode test su lavfi e controller di processo:
-```bash
-cargo test --workspace
-```
