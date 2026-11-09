@@ -1,0 +1,32 @@
+id = "h264_vaapi"
+kind = "video"
+label = "H.264 / AVC (Intel/AMD VAAPI)"
+hw = "vaapi"
+input_args = ["-init_hw_device", "vaapi=va:{vaapi_device}", "-filter_hw_device", "va"]
+filter_suffix = "format=nv12,hwupload"
+containers = ["mkv", "mp4", "mov"]
+
+[[param]]
+id = "qp"
+label = "Quantizzazione (QP)"
+flag = "-qp"
+type = "int"
+min = 0
+max = 52
+default = 23
+hint = "Valore di quantizzazione QP (più basso = qualità maggiore)"
+
+[[preset]]
+id = "max"
+label = "Massima qualità"
+values = { qp = 19 }
+
+[[preset]]
+id = "media"
+label = "Qualità media"
+values = { qp = 24 }
+
+[[preset]]
+id = "bassa"
+label = "Bassa qualità"
+values = { qp = 29 }

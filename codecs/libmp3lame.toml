@@ -1,0 +1,54 @@
+id = "libmp3lame"
+kind = "audio"
+label = "MP3 (LAME)"
+containers = ["mp3", "mkv"]
+
+[[param]]
+id = "rate_control"
+label = "Controllo bitrate"
+flag = ""
+type = "choice"
+choices = ["vbr", "cbr"]
+default = "vbr"
+hint = "VBR ottimizza il file in base alla complessità sonora, CBR garantisce bitrate costante"
+
+[[param]]
+id = "qscale"
+label = "Qualità VBR (qscale)"
+flag = "-qscale"
+type = "int"
+min = 0
+max = 9
+default = 2
+hint = "0 = massima qualità (~245 kbps), 2 = alta (~190 kbps), 4 = media (~165 kbps)"
+only_if = { param = "rate_control", value = "vbr" }
+
+[[param]]
+id = "bitrate"
+label = "Bitrate fisso (CBR)"
+flag = "-b"
+type = "choice"
+choices = ["96k", "128k", "160k", "192k", "256k", "320k"]
+default = "192k"
+hint = "Usato se si desidera un bitrate costante invece di VBR"
+only_if = { param = "rate_control", value = "cbr" }
+
+[[preset]]
+id = "v0"
+label = "V0 Estrema qualità (VBR)"
+values = { rate_control = "vbr", qscale = 0 }
+
+[[preset]]
+id = "v2"
+label = "V2 Standard consigliato (VBR)"
+values = { rate_control = "vbr", qscale = 2 }
+
+[[preset]]
+id = "cbr320"
+label = "CBR 320 kbps"
+values = { rate_control = "cbr", bitrate = "320k" }
+
+[[preset]]
+id = "cbr192"
+label = "CBR 192 kbps"
+values = { rate_control = "cbr", bitrate = "192k" }

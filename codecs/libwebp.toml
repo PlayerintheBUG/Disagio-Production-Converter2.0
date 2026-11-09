@@ -1,0 +1,37 @@
+id = "libwebp"
+kind = "image"
+label = "WebP"
+containers = ["webp"]
+
+[[param]]
+id = "quality"
+label = "Qualità"
+flag = "-quality"
+type = "int"
+min = 0
+max = 100
+default = 80
+hint = "Qualità di compressione con perdita (0-100)"
+
+[[param]]
+id = "lossless"
+label = "Senza perdita (Lossless)"
+flag = "-lossless"
+type = "bool"
+default = false
+hint = "Attiva compressione perfettamente fedele all'originale"
+
+[[preset]]
+id = "lossless"
+label = "Senza perdita"
+values = { lossless = true }
+
+[[preset]]
+id = "alta"
+label = "Alta qualità (90)"
+values = { quality = 90, lossless = false }
+
+[[preset]]
+id = "web"
+label = "Ottimizzato web (75)"
+values = { quality = 75, lossless = false }

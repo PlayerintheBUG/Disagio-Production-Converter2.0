@@ -1,0 +1,47 @@
+id = "prores_ks"
+kind = "video"
+label = "Apple ProRes (Kostya)"
+containers = ["mov", "mkv"]
+
+[[param]]
+id = "profile"
+label = "Profilo ProRes"
+flag = "-profile"
+type = "choice"
+choices = ["proxy", "lt", "standard", "hq", "4444", "4444xq"]
+default = "standard"
+hint = "Proxy (basso bitrate), LT, Standard (montaggio), HQ (master), 4444 (con alfa/12-bit)"
+
+[[param]]
+id = "pix_fmt"
+label = "Formato pixel"
+flag = "-pix_fmt"
+type = "choice"
+choices = ["yuv422p10le", "yuv444p10le", "yuva444p10le"]
+default = "yuv422p10le"
+hint = "Formato colore per ProRes"
+
+[[preset]]
+id = "hq"
+label = "ProRes HQ"
+values = { profile = "hq", pix_fmt = "yuv422p10le" }
+
+[[preset]]
+id = "standard"
+label = "ProRes Standard"
+values = { profile = "standard", pix_fmt = "yuv422p10le" }
+
+[[preset]]
+id = "proxy"
+label = "ProRes Proxy (leggero)"
+values = { profile = "proxy", pix_fmt = "yuv422p10le" }
+
+[[preset]]
+id = "4444"
+label = "ProRes 4444 (Alfa/Master)"
+values = { profile = "4444", pix_fmt = "yuva444p10le" }
+
+[[rule]]
+when = { param = "profile", in = ["4444", "4444xq"] }
+unless = { param = "pix_fmt", in = ["yuv444p10le", "yuva444p10le"] }
+then = { warn = "I profili 4444 richiedono un formato 4:4:4 (yuva444p10le se serve il canale alfa)" }

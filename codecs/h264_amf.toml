@@ -1,0 +1,58 @@
+id = "h264_amf"
+kind = "video"
+label = "H.264 (AMD AMF)"
+hw = "amf"
+containers = ["mkv", "mp4", "mov", "ts"]
+
+[[param]]
+id = "quality"
+label = "Preset qualità / velocità"
+flag = "-quality"
+type = "choice"
+choices = ["speed", "balanced", "quality"]
+default = "quality"
+hint = "Bilanciamento tra velocità di codifica e qualità visiva"
+
+[[param]]
+id = "usage"
+label = "Profilo di utilizzo"
+flag = "-usage"
+type = "choice"
+choices = ["transcoding", "high_quality", "lowlatency"]
+default = "transcoding"
+hint = "transcoding = ideale per conversione file"
+
+[[param]]
+id = "qp_i"
+label = "Quantizzazione QP (Frame I)"
+flag = "-qp_i"
+type = "int"
+min = 0
+max = 51
+default = 22
+hint = "Più basso = qualità maggiore (18-26 consigliato)"
+
+[[param]]
+id = "qp_p"
+label = "Quantizzazione QP (Frame P)"
+flag = "-qp_p"
+type = "int"
+min = 0
+max = 51
+default = 24
+hint = "Più basso = qualità maggiore"
+
+[[preset]]
+id = "max"
+label = "Massima qualità"
+values = { quality = "quality", qp_i = 18, qp_p = 20 }
+
+[[preset]]
+id = "media"
+label = "Qualità media"
+values = { quality = "balanced", qp_i = 22, qp_p = 24 }
+
+[[preset]]
+id = "rapido"
+label = "Veloce"
+values = { quality = "speed", qp_i = 26, qp_p = 28 }

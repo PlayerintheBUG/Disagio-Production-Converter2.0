@@ -1,0 +1,48 @@
+id = "libx264"
+kind = "video"
+label = "H.264 / AVC (x264)"
+is_default = true
+containers = ["mkv", "mp4", "mov", "ts"]
+
+[[param]]
+id = "crf"
+label = "Qualità (CRF)"
+flag = "-crf"
+type = "int"
+min = 0
+max = 51
+default = 23
+hint = "Più basso = qualità maggiore e file più grande (consigliato 18-28)"
+
+[[param]]
+id = "preset"
+label = "Velocità di codifica"
+flag = "-preset"
+type = "choice"
+choices = ["ultrafast", "superfast", "veryfast", "faster", "fast", "medium", "slow", "slower", "veryslow"]
+default = "medium"
+hint = "Più lento = migliore compressione a parità di qualità"
+
+[[param]]
+id = "pix_fmt"
+label = "Formato colore"
+flag = "-pix_fmt"
+type = "choice"
+choices = ["yuv420p", "yuv420p10le", "yuv422p", "yuv444p"]
+default = "yuv420p"
+hint = "yuv420p garantisce la massima compatibilità con tutti i dispositivi"
+
+[[preset]]
+id = "max"
+label = "Massima qualità"
+values = { crf = 17, preset = "slow", pix_fmt = "yuv420p" }
+
+[[preset]]
+id = "media"
+label = "Qualità media"
+values = { crf = 23, preset = "medium", pix_fmt = "yuv420p" }
+
+[[preset]]
+id = "bassa"
+label = "Bassa (file piccolo)"
+values = { crf = 28, preset = "fast", pix_fmt = "yuv420p" }

@@ -1,0 +1,32 @@
+id = "av1_vaapi"
+kind = "video"
+label = "AV1 (Intel/AMD VAAPI)"
+hw = "vaapi"
+input_args = ["-init_hw_device", "vaapi=va:{vaapi_device}", "-filter_hw_device", "va"]
+filter_suffix = "format=nv12,hwupload"
+containers = ["mkv", "mp4", "webm"]
+
+[[param]]
+id = "qp"
+label = "Quantizzazione (QP)"
+flag = "-qp"
+type = "int"
+min = 0
+max = 255
+default = 28
+hint = "Valore di quantizzazione QP (più basso = qualità maggiore, 24-32 consigliato)"
+
+[[preset]]
+id = "max"
+label = "Massima qualità"
+values = { qp = 22 }
+
+[[preset]]
+id = "media"
+label = "Qualità media"
+values = { qp = 28 }
+
+[[preset]]
+id = "bassa"
+label = "Bassa qualità"
+values = { qp = 34 }

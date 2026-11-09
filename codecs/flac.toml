@@ -1,0 +1,29 @@
+id = "flac"
+kind = "audio"
+label = "FLAC (Lossless)"
+containers = ["flac", "mka", "mkv", "ogg"]
+
+[[param]]
+id = "compression_level"
+label = "Livello di compressione"
+flag = "-compression_level"
+type = "int"
+min = 0
+max = 12
+default = 5
+hint = "La qualità è sempre lossless identica; livelli più alti impiegano più CPU per risparmiare spazio"
+
+[[preset]]
+id = "veloce"
+label = "Compressione veloce"
+values = { compression_level = 3 }
+
+[[preset]]
+id = "standard"
+label = "Compressione standard"
+values = { compression_level = 5 }
+
+[[preset]]
+id = "massima"
+label = "Compressione massima"
+values = { compression_level = 8 }

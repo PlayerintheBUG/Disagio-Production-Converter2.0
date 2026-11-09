@@ -1,0 +1,48 @@
+id = "libsvtav1"
+kind = "video"
+label = "AV1 (SVT-AV1)"
+containers = ["mkv", "mp4", "webm"]
+
+[[param]]
+id = "crf"
+label = "Qualità (CRF)"
+flag = "-crf"
+type = "int"
+min = 0
+max = 63
+default = 28
+hint = "Consigliato 24-32 per SVT-AV1"
+
+[[param]]
+id = "preset"
+label = "Preset velocità"
+flag = "-preset"
+type = "int"
+min = 0
+max = 13
+default = 6
+hint = "0 = più lento (massima efficienza), 13 = più veloce"
+
+[[param]]
+id = "pix_fmt"
+label = "Formato colore"
+flag = "-pix_fmt"
+type = "choice"
+choices = ["yuv420p", "yuv420p10le"]
+default = "yuv420p10le"
+hint = "10-bit riduce il banding ed è consigliato per AV1"
+
+[[preset]]
+id = "max"
+label = "Massima qualità (10-bit)"
+values = { crf = 22, preset = 4, pix_fmt = "yuv420p10le" }
+
+[[preset]]
+id = "media"
+label = "Qualità bilanciata"
+values = { crf = 28, preset = 6, pix_fmt = "yuv420p10le" }
+
+[[preset]]
+id = "bassa"
+label = "Veloce"
+values = { crf = 34, preset = 8, pix_fmt = "yuv420p" }

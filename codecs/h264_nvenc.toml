@@ -1,0 +1,100 @@
+id = "h264_nvenc"
+kind = "video"
+label = "H.264 / AVC (NVIDIA NVENC, CUDA)"
+hw = "nvenc"
+containers = ["mkv", "mp4", "mov"]
+
+# --- Parametri ---
+
+[[param]]
+id = "rc"
+label = "Controllo bitrate (Rate Control)"
+flag = "-rc"
+type = "choice"
+choices = ["vbr", "cbr", "constqp"]
+default = "vbr"
+hint = "VBR (qualità costante raccomandata), CBR (bitrate fisso), ConstQP"
+
+[[param]]
+id = "cq"
+label = "Qualità (CQ)"
+flag = "-cq"
+type = "int"
+min = 0
+max = 51
+default = 23
+only_if = { param = "rc", in = ["vbr"] }
+hint = "Più basso = qualità maggiore. 18-24 è il range consigliato"
+
+[[param]]
+id = "b_v"
+label = "Bitrate video"
+flag = "-b"
+type = "choice"
+choices = ["2M", "4M", "8M", "12M", "20M"]
+default = "8M"
+only_if = { param = "rc", in = ["cbr"] }
+hint = "Bitrate video fisso per modalità CBR"
+
+[[param]]
+id = "qp"
+label = "Quantizzazione (QP)"
+flag = "-qp"
+type = "int"
+min = 0
+max = 51
+default = 24
+only_if = { param = "rc", in = ["constqp"] }
+hint = "Quantizzazione costante per modalità ConstQP"
+
+[[param]]
+id = "preset"
+label = "Velocità / qualità"
+flag = "-preset"
+type = "choice"
+choices = ["p1", "p2", "p3", "p4", "p5", "p6", "p7"]
+default = "p5"
+hint = "p1 (massima velocità) .. p7 (massima qualità). p5 è il default consigliato"
+
+[[param]]
+id = "tune"
+label = "Ottimizzazione (Tune)"
+flag = "-tune"
+type = "choice"
+choices = ["hq", "ll", "ull", "lossless"]
+default = "hq"
+hint = "hq (alta qualità), ll (bassa latenza)"
+
+[[param]]
+id = "spatial_aq"
+label = "Quantizzazione Adattiva Spaziale"
+flag = "-spatial-aq"
+type = "bool"
+default = true
+hint = "Migliora la qualità visiva nelle aree complesse"
+
+[[param]]
+id = "pix_fmt"
+label = "Formato colore"
+flag = "-pix_fmt"
+type = "choice"
+choices = ["yuv420p", "yuv444p"]
+default = "yuv420p"
+hint = "yuv420p (massima compatibilità)"
+
+# --- Preset ---
+
+[[preset]]
+id = "max"
+label = "Massima qualità"
+values = { rc = "vbr", cq = 18, preset = "p7", tune = "hq", spatial_aq = true, pix_fmt = "yuv420p" }
+
+[[preset]]
+id = "media"
+label = "Qualità media (bilanciata)"
+values = { rc = "vbr", cq = 23, preset = "p5", tune = "hq", spatial_aq = true, pix_fmt = "yuv420p" }
+
+[[preset]]
+id = "bassa"
+label = "Bassa (molto veloce)"
+values = { rc = "vbr", cq = 28, preset = "p2", tune = "hq", spatial_aq = false, pix_fmt = "yuv420p" }

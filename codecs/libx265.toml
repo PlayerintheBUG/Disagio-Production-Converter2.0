@@ -1,0 +1,51 @@
+id = "libx265"
+kind = "video"
+label = "H.265 / HEVC (x265)"
+containers = ["mkv", "mp4", "mov"]
+
+# --- Parametri: la GUI crea un controllo per ciascuno ---
+
+[[param]]
+id = "crf"
+label = "Qualità (CRF)"
+flag = "-crf"
+type = "int"
+min = 0
+max = 51
+default = 23
+hint = "Più basso = qualità maggiore e file più grande"
+
+[[param]]
+id = "preset"
+label = "Velocità di codifica"
+flag = "-preset"
+type = "choice"
+choices = ["ultrafast", "superfast", "veryfast", "faster", "fast", "medium", "slow", "slower", "veryslow"]
+default = "medium"
+hint = "Più lento = file più piccolo a parità di qualità"
+
+[[param]]
+id = "pix_fmt"
+label = "Formato colore"
+flag = "-pix_fmt"
+type = "choice"
+choices = ["yuv420p", "yuv420p10le", "yuv422p10le", "yuv444p10le"]
+default = "yuv420p"
+hint = "Campionamento del colore (4:2:0, 4:2:2, 4:4:4) e profondità in bit"
+
+# --- Preset: solo valori per i controlli qui sopra ---
+
+[[preset]]
+id = "max"
+label = "Massima qualità"
+values = { crf = 16, preset = "slow", pix_fmt = "yuv420p10le" }
+
+[[preset]]
+id = "media"
+label = "Qualità media"
+values = { crf = 23, preset = "medium", pix_fmt = "yuv420p" }
+
+[[preset]]
+id = "bassa"
+label = "Bassa (file piccolo)"
+values = { crf = 28, preset = "fast", pix_fmt = "yuv420p" }

@@ -1,0 +1,39 @@
+id = "h264_qsv"
+kind = "video"
+label = "H.264 (Intel QuickSync)"
+hw = "qsv"
+containers = ["mkv", "mp4", "mov", "ts"]
+
+[[param]]
+id = "global_quality"
+label = "Qualità globale (ICQ)"
+flag = "-global_quality"
+type = "int"
+min = 1
+max = 51
+default = 23
+hint = "Qualità costante ICQ: 18-24 consigliato (valori più bassi = qualità maggiore)"
+
+[[param]]
+id = "preset"
+label = "Preset velocità / qualità"
+flag = "-preset"
+type = "choice"
+choices = ["veryfast", "faster", "fast", "medium", "slow", "slower", "veryslow"]
+default = "medium"
+hint = "veryslow = massima compressione, veryfast = massima velocità"
+
+[[preset]]
+id = "max"
+label = "Massima qualità"
+values = { global_quality = 18, preset = "slower" }
+
+[[preset]]
+id = "media"
+label = "Qualità media"
+values = { global_quality = 23, preset = "medium" }
+
+[[preset]]
+id = "rapido"
+label = "Veloce"
+values = { global_quality = 28, preset = "faster" }

@@ -1,0 +1,28 @@
+id = "aac"
+kind = "audio"
+label = "AAC"
+containers = ["mp4", "m4a", "mkv", "mov", "ts"]
+
+[[param]]
+id = "bitrate"
+label = "Bitrate"
+flag = "-b"
+type = "choice"
+choices = ["96k", "128k", "192k", "256k", "320k"]
+default = "192k"
+hint = "Bitrate audio per canale stereo"
+
+[[preset]]
+id = "alta"
+label = "Alta qualità (256k)"
+values = { bitrate = "256k" }
+
+[[preset]]
+id = "standard"
+label = "Standard (192k)"
+values = { bitrate = "192k" }
+
+[[preset]]
+id = "bassa"
+label = "Compatta (128k)"
+values = { bitrate = "128k" }

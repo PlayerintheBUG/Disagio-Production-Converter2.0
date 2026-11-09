@@ -1,0 +1,38 @@
+id = "libopus"
+kind = "audio"
+label = "Opus"
+is_default = true
+containers = ["mka", "ogg", "opus", "mkv", "webm"]
+
+[[param]]
+id = "bitrate"
+label = "Bitrate"
+flag = "-b"
+type = "choice"
+choices = ["64k", "96k", "128k", "160k", "192k", "256k", "320k"]
+default = "128k"
+hint = "128k offre qualità trasparente per la maggior parte dei brani stereo"
+
+[[param]]
+id = "vbr"
+label = "Bitrate variabile (VBR)"
+flag = "-vbr"
+type = "choice"
+choices = ["on", "off", "constrained"]
+default = "on"
+hint = "VBR ottimizza il bitrate in base alla complessità sonora"
+
+[[preset]]
+id = "alta"
+label = "Alta fedeltà (192k)"
+values = { bitrate = "192k", vbr = "on" }
+
+[[preset]]
+id = "standard"
+label = "Standard (128k)"
+values = { bitrate = "128k", vbr = "on" }
+
+[[preset]]
+id = "voce"
+label = "Voce / Podcast (64k)"
+values = { bitrate = "64k", vbr = "on" }
