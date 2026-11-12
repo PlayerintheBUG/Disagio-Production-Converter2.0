@@ -33,9 +33,10 @@ impl WhisperBackend {
             return false;
         }
 
-        Command::new(python)
-            .args(["-c", "import faster_whisper"])
-            .output()
+        let mut cmd = Command::new(python);
+        cmd.args(["-c", "import faster_whisper"]);
+        crate::hide_console_window(&mut cmd);
+        cmd.output()
             .map(|out| out.status.success())
             .unwrap_or(false)
     }
@@ -69,10 +70,10 @@ impl WhisperBackend {
             tx_log(format!("Creazione ambiente virtuale Python in {}...", venv_dir.display()));
 
             let py_cmd = if cfg!(windows) { "python" } else { "python3" };
-            let venv_spawn = Command::new(py_cmd)
-                .args(["-m", "venv"])
-                .arg(&venv_dir)
-                .spawn();
+            let mut venv_cmd = Command::new(py_cmd);
+            venv_cmd.args(["-m", "venv"]).arg(&venv_dir);
+            crate::hide_console_window(&mut venv_cmd);
+            let venv_spawn = venv_cmd.spawn();
 
             let venv_child = match venv_spawn {
                 Ok(c) => c,
@@ -138,11 +139,13 @@ impl WhisperBackend {
             }
 
             let python_bin = Self::python_executable();
-            let mut child = match Command::new(&python_bin)
+            let mut pip_cmd = Command::new(&python_bin);
+            pip_cmd
                 .args(["-m", "pip", "install", "--upgrade", "pip", "faster-whisper"])
                 .stdout(Stdio::piped())
-                .stderr(Stdio::piped())
-                .spawn()
+                .stderr(Stdio::piped());
+            crate::hide_console_window(&mut pip_cmd);
+            let mut child = match pip_cmd.spawn()
             {
                 Ok(c) => c,
                 Err(e) => {

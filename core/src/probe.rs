@@ -115,7 +115,9 @@ pub fn probe_file(path: &Path) -> Result<ProbeResult, ProbeError> {
 }
 
 pub fn probe_file_with_program(ffprobe_bin: &Path, path: &Path) -> Result<ProbeResult, ProbeError> {
-    let output = Command::new(ffprobe_bin)
+    let mut cmd = Command::new(ffprobe_bin);
+    crate::hide_console_window(&mut cmd);
+    let output = cmd
         .args([
             "-v",
             "error",

@@ -154,8 +154,10 @@ impl Runner {
         total_duration_s: Option<f64>,
         progress_parser: ProgressParser,
     ) -> Result<(ProcessController, Receiver<Event>), std::io::Error> {
-        let mut child = Command::new(program)
-            .args(args)
+        let mut cmd = Command::new(program);
+        cmd.args(args);
+        crate::hide_console_window(&mut cmd);
+        let mut child = cmd
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())

@@ -364,9 +364,10 @@ impl Catalog {
 }
 
 pub fn query_available_ffmpeg_encoders_with(ffmpeg_bin: &Path) -> Result<HashSet<String>, Box<dyn std::error::Error>> {
-    let output = Command::new(ffmpeg_bin)
-        .args(["-hide_banner", "-encoders"])
-        .output()?;
+    let mut cmd = Command::new(ffmpeg_bin);
+    cmd.args(["-hide_banner", "-encoders"]);
+    crate::hide_console_window(&mut cmd);
+    let output = cmd.output()?;
 
     if !output.status.success() {
         return Err("ffmpeg -encoders returned non-zero exit code".into());

@@ -94,6 +94,7 @@ impl GpuBackend {
     ) -> bool {
         let mut cmd = Command::new(ffmpeg_bin);
         cmd.args(["-hide_banner", "-y"]);
+        crate::hide_console_window(&mut cmd);
 
         match hw_type {
             GpuHwType::Nvenc => {
