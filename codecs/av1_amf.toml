@@ -56,3 +56,18 @@ values = { quality = "balanced", qp_i = 26, qp_p = 28 }
 id = "rapido"
 label = "Veloce"
 values = { quality = "speed", qp_i = 30, qp_p = 32 }
+
+[[param]]
+id = "rc"
+label = "Controllo bitrate (Rate Control)"
+flag = "-rc"
+type = "choice"
+choices = ["cqp", "cbr", "vbr_peak"]
+hint = "cqp = qualità costante, cbr/vbr = bitrate (lascia vuoto per il default del driver)"
+
+[[param]]
+id = "b_v"
+label = "Bitrate video (es. 1500k, vuoto = automatico)"
+flag = "-b:v"
+type = "string"
+hint = "Imposta un bitrate video fisso; lascia vuoto per CRF/CQ"

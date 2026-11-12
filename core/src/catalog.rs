@@ -13,6 +13,8 @@ pub enum ParamType {
     Float,
     Choice,
     Bool,
+    #[serde(rename = "string", alias = "text")]
+    Str,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

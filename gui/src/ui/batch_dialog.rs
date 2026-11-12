@@ -1,6 +1,6 @@
 use crate::app::FfGuiApp;
 use eframe::egui::{self, Color32, RichText};
-use ffgui_core::batch::{BatchProfile, CollisionPolicy, MediaKind, OnErrorPolicy, PlanState};
+use ffgui_core::batch::{AudioQualityMode, BatchProfile, CollisionPolicy, MediaKind, OnErrorPolicy, PlanState};
 use ffgui_core::model::{AudioRule, StreamKind};
 
 fn format_bytes(bytes: u64) -> String {
@@ -234,6 +234,10 @@ fn render_profiles_section(ui: &mut egui::Ui, app: &mut FfGuiApp) {
             }
 
             if let Some(prof) = app.batch_settings.profiles.get_mut(&MediaKind::Video) {
+                ui.collapsing("Qualità video (Auto / Preset / Fissa)...", |ui| {
+                    crate::ui::controls_panel::render_quality_mode_ui(ui, &mut prof.video_quality);
+                });
+
                 // Quick inline modifiers for Video Profile
                 ui.collapsing("Modifica regole video...", |ui| {
                     ui.horizontal(|ui| {
@@ -325,6 +329,19 @@ fn render_profiles_section(ui: &mut egui::Ui, app: &mut FfGuiApp) {
                             trigger_rescan = true;
                         }
                     });
+
+                    ui.horizontal(|ui| {
+                        ui.label("Bitrate:");
+                        if ui.radio(prof.audio_quality == AudioQualityMode::Manual, "Manuale").clicked() {
+                            prof.audio_quality = AudioQualityMode::Manual;
+                        }
+                        if ui.radio(prof.audio_quality == AudioQualityMode::Auto, "Automatico").clicked() {
+                            prof.audio_quality = AudioQualityMode::Auto;
+                        }
+                    });
+                    if prof.audio_quality == AudioQualityMode::Auto {
+                        ui.small(RichText::new("Bitrate calcolato dai canali della traccia sorgente").color(Color32::GRAY));
+                    }
                 });
             }
         });

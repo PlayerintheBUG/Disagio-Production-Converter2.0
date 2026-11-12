@@ -1,3 +1,4 @@
+use crate::batch::{AudioQualityMode, QualityMode};
 use crate::builtin_codecs::BUILTIN_WHISPER_SCRIPT;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -37,6 +38,12 @@ pub struct AppSettings {
     /// Maximum concurrent GPU encoding sessions (default 2)
     #[serde(default = "default_max_gpu_sessions")]
     pub max_gpu_sessions: usize,
+    /// Video quality mode for the single-file panel (Manual = codec params as chosen)
+    #[serde(default)]
+    pub video_quality: QualityMode,
+    /// Audio bitrate mode for the single-file panel
+    #[serde(default)]
+    pub audio_quality: AudioQualityMode,
 }
 
 fn default_log_level() -> String {
@@ -90,6 +97,8 @@ impl Default for AppSettings {
             parallel_jobs: default_parallel_jobs(),
             auto_cpu_fallback: default_auto_cpu_fallback(),
             max_gpu_sessions: default_max_gpu_sessions(),
+            video_quality: QualityMode::default(),
+            audio_quality: AudioQualityMode::default(),
         }
     }
 }

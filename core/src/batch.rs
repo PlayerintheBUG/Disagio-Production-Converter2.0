@@ -1,5 +1,5 @@
 use crate::catalog::Catalog;
-use crate::model::{AudioRule, JobTemplate, SubtitleRule, VideoRule};
+use crate::model::{AudioRule, CodecConfig, Job, JobTemplate, SubtitleRule, VideoRule};
 use crate::validate::paths_refer_to_same_file;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap, HashSet};
@@ -65,16 +65,40 @@ pub struct AutoOptions {
     pub use_bpp_probe: bool,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+/// Modalità di determinazione della qualità video.
+/// `Manual` = usa i parametri scelti dall'utente nel pannello del codec (comportamento originale).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 pub enum QualityMode {
+    #[default]
+    Manual,
     Preset(QualityTier),
     Fixed { param_id: String, value: f64 },
     Auto(AutoOptions),
 }
 
-impl Default for QualityMode {
-    fn default() -> Self {
-        QualityMode::Preset(QualityTier::Medium)
+/// Modalità di determinazione del bitrate audio.
+/// `Manual` = usa il bitrate scelto dall'utente; `Auto` = calcolato dai canali sorgente.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub enum AudioQualityMode {
+    #[default]
+    Manual,
+    Auto,
+}
+
+impl QualityMode {
+    pub fn label(&self) -> String {
+        match self {
+            QualityMode::Manual => "Manuale (parametri codec)".to_string(),
+            QualityMode::Preset(QualityTier::High) => "Preset: Alta".to_string(),
+            QualityMode::Preset(QualityTier::Medium) => "Preset: Media".to_string(),
+            QualityMode::Preset(QualityTier::Low) => "Preset: Bassa".to_string(),
+            QualityMode::Fixed { value, .. } => format!("Fissa: {}", value),
+            QualityMode::Auto(opts) => match &opts.size_cap {
+                Some(SizeCap::Megabytes(mb)) => format!("Auto: max {} MB", mb),
+                Some(SizeCap::PercentReduction(pct)) => format!("Auto: -{}%", pct),
+                None => "Auto (qualità adattiva)".to_string(),
+            },
+        }
     }
 }
 
@@ -86,6 +110,32 @@ pub struct ResolvedQuality {
     pub summary: String,
 }
 
+/// Id del parametro di controllo qualità (rate control) per famiglia di encoder.
+pub fn rate_control_param(codec_id: &str) -> &'static str {
+    if codec_id.ends_with("_nvenc") {
+        "cq"
+    } else if codec_id.ends_with("_vaapi") {
+        "qp"
+    } else if codec_id.ends_with("_qsv") {
+        "global_quality"
+    } else if codec_id.ends_with("_amf") {
+        "qp_i"
+    } else {
+        "crf"
+    }
+}
+
+fn crf_max_for(codec_id: &str) -> i32 {
+    if codec_id.contains("svtav1") {
+        63
+    } else {
+        51
+    }
+}
+
+/// Chiavi dei parametri di rate control da neutralizzare in modalità bitrate.
+const RATE_CONTROL_KEYS: &[&str] = &["crf", "cq", "qp", "global_quality", "qp_i", "qp_p"];
+
 pub fn resolve_quality(
     mode: &QualityMode,
     probe: Option<&crate::probe::ProbeResult>,
@@ -93,17 +143,34 @@ pub fn resolve_quality(
     dst_height: Option<u32>,
     codec_id: &str,
     src_file_size: Option<u64>,
+    audio_bitrate_kbps: Option<u32>,
 ) -> ResolvedQuality {
     let mut extra_params = HashMap::new();
 
     match mode {
+        QualityMode::Manual => ResolvedQuality {
+            cq: None,
+            bitrate_kbps: None,
+            extra_params,
+            summary: "Manuale".to_string(),
+        },
         QualityMode::Fixed { param_id, value } => {
-            extra_params.insert(param_id.clone(), serde_json::json!(*value));
+            let param_id = if param_id.is_empty() {
+                rate_control_param(codec_id).to_string()
+            } else {
+                param_id.clone()
+            };
+            let clamped = (*value as i32).clamp(0, crf_max_for(codec_id)) as u32;
+            if param_id == "qp_i" {
+                extra_params.insert("rc".to_string(), serde_json::json!("cqp"));
+                extra_params.insert("qp_p".to_string(), serde_json::json!(clamped));
+            }
+            extra_params.insert(param_id.clone(), serde_json::json!(clamped));
             ResolvedQuality {
-                cq: Some(*value as u32),
+                cq: Some(clamped),
                 bitrate_kbps: None,
                 extra_params,
-                summary: format!("{}: {}", param_id, value),
+                summary: format!("Fissa ({} {})", param_id.to_uppercase(), clamped),
             }
         }
         QualityMode::Preset(tier) => {
@@ -143,29 +210,34 @@ pub fn resolve_quality(
         }
         QualityMode::Auto(opts) => {
             let duration_s = probe.and_then(|p| p.duration_s).unwrap_or(0.0);
+            let audio_kbps_est = audio_bitrate_kbps.unwrap_or(0) as f64;
 
             // 1. Check size cap
             if let Some(ref cap) = opts.size_cap {
-                if duration_s > 0.0 {
-                    let bitrate_target_kbps = match cap {
-                        SizeCap::Megabytes(mb) if *mb > 0.0 => {
+                let cap_applies = match cap {
+                    SizeCap::Megabytes(mb) => *mb > 0.0 && duration_s > 0.0,
+                    SizeCap::PercentReduction(_) => src_file_size.map(|s| s > 0).unwrap_or(false) && duration_s > 0.0,
+                };
+
+                if cap_applies {
+                    let target_kbps = match cap {
+                        SizeCap::Megabytes(mb) => {
                             let target_bits = mb * 8.0 * 1024.0 * 1024.0;
-                            let audio_bits = 192_000.0 * duration_s;
+                            let audio_bits = audio_kbps_est * 1000.0 * duration_s;
                             let video_bits = (target_bits - audio_bits).max(0.0);
                             Some((video_bits / duration_s / 1000.0) as u32)
                         }
-                        SizeCap::PercentReduction(pct) if *pct > 0.0 => {
+                        SizeCap::PercentReduction(pct) => {
                             let src_bytes = src_file_size.unwrap_or(0) as f64;
-                            let target_bytes = src_bytes * (1.0 - pct / 100.0);
+                            let target_bytes = src_bytes * (1.0 - pct.clamp(0.0, 99.0) / 100.0);
                             let target_bits = target_bytes * 8.0;
-                            let audio_bits = 192_000.0 * duration_s;
+                            let audio_bits = audio_kbps_est * 1000.0 * duration_s;
                             let video_bits = (target_bits - audio_bits).max(0.0);
                             Some((video_bits / duration_s / 1000.0) as u32)
                         }
-                        _ => None,
                     };
 
-                    if let Some(target_kbps) = bitrate_target_kbps {
+                    if let Some(target_kbps) = target_kbps {
                         let min_kbps = if codec_id.contains("av1") {
                             100
                         } else if codec_id.contains("hevc") || codec_id.contains("x265") {
@@ -174,13 +246,26 @@ pub fn resolve_quality(
                             200
                         };
                         let final_kbps = target_kbps.max(min_kbps);
-                        extra_params.insert("b".to_string(), serde_json::json!(format!("{}k", final_kbps)));
+                        let cap_desc = match cap {
+                            SizeCap::Megabytes(mb) => format!("max {:.0} MB", mb),
+                            SizeCap::PercentReduction(pct) => format!("-{:.0}%", pct),
+                        };
+
+                        // In modalità bitrate il CRF/CQ va neutralizzato (Value::Null
+                        // sopprime l'emissione del default del TOML nel builder).
+                        for key in RATE_CONTROL_KEYS {
+                            extra_params.insert(key.to_string(), serde_json::Value::Null);
+                        }
+                        extra_params.insert("b_v".to_string(), serde_json::json!(format!("{}k", final_kbps)));
+                        if codec_id.ends_with("_nvenc") || codec_id.ends_with("_amf") {
+                            extra_params.insert("rc".to_string(), serde_json::json!("cbr"));
+                        }
 
                         return ResolvedQuality {
                             cq: None,
                             bitrate_kbps: Some(final_kbps),
                             extra_params,
-                            summary: format!("AUTO Bitrate {} kbps", final_kbps),
+                            summary: format!("AUTO Bitrate {} kbps (target: {})", final_kbps, cap_desc),
                         };
                     }
                 }
@@ -240,47 +325,215 @@ pub fn resolve_quality(
                 -3
             };
 
-            let src_pixels = (src_w * src_h).max(1) as f64;
-            let dst_pixels = (dst_w * dst_h).max(1) as f64;
-            let bitrate = probe.and_then(|p| p.bit_rate).unwrap_or(5_000_000) as f64;
-            let bpp = (bitrate / fps.max(1.0)) / src_pixels;
-            let bpp_dst = bpp * (src_pixels / dst_pixels);
-
-            let delta_bpp: i32 = if bpp_dst < 0.05 {
-                6
-            } else if bpp_dst < 0.15 {
-                3
-            } else if bpp_dst < 0.40 {
-                0
-            } else if bpp_dst < 1.0 {
-                -3
-            } else if bpp_dst < 3.0 {
-                -5
+            let cq_max = crf_max_for(codec_id);
+            let (delta_bpp, bpp_dst) = if !opts.use_bpp_probe {
+                (0, 0.0)
             } else {
-                -7
+                let src_pixels = (src_w * src_h).max(1) as f64;
+                let dst_pixels = (dst_w * dst_h).max(1) as f64;
+                // Il bit_rate del contenitore include l'audio: sottrai una stima
+                // del contributo audio per avvicinarti al bitrate video reale.
+                let audio_stream_count = probe
+                    .map(|p| p.streams.iter().filter(|s| s.kind == crate::model::StreamKind::Audio).count())
+                    .unwrap_or(0) as f64;
+                let container_bitrate = probe.and_then(|p| p.bit_rate).unwrap_or(5_000_000) as f64;
+                let video_bitrate = (container_bitrate - audio_stream_count * 128_000.0).max(container_bitrate * 0.25);
+                let bpp = (video_bitrate / fps.max(1.0)) / src_pixels;
+                let bpp_dst = bpp * (src_pixels / dst_pixels);
+
+                let delta: i32 = if bpp_dst < 0.05 {
+                    6
+                } else if bpp_dst < 0.15 {
+                    3
+                } else if bpp_dst < 0.40 {
+                    0
+                } else if bpp_dst < 1.0 {
+                    -3
+                } else if bpp_dst < 3.0 {
+                    -5
+                } else {
+                    -7
+                };
+                (delta, bpp_dst)
             };
 
-            let final_cq = (base_cq + delta_res + delta_fps + delta_depth + delta_bpp).clamp(8, 51) as u32;
+            let final_cq = (base_cq + delta_res + delta_fps + delta_depth + delta_bpp).clamp(8, cq_max) as u32;
 
-            let param_key = if codec_id.ends_with("_nvenc") {
-                "cq"
-            } else if codec_id.ends_with("_vaapi") {
-                "qp"
-            } else if codec_id.ends_with("_qsv") {
-                "global_quality"
+            match rate_control_param(codec_id) {
+                "cq" => {
+                    extra_params.insert("cq".to_string(), serde_json::json!(final_cq));
+                }
+                "qp" => {
+                    extra_params.insert("qp".to_string(), serde_json::json!(final_cq));
+                }
+                "global_quality" => {
+                    extra_params.insert("global_quality".to_string(), serde_json::json!(final_cq));
+                }
+                "qp_i" => {
+                    extra_params.insert("rc".to_string(), serde_json::json!("cqp"));
+                    extra_params.insert("qp_i".to_string(), serde_json::json!(final_cq));
+                    extra_params.insert("qp_p".to_string(), serde_json::json!(final_cq));
+                }
+                _ => {
+                    extra_params.insert("crf".to_string(), serde_json::json!(final_cq));
+                }
+            }
+
+            let cap_note = if opts.size_cap.is_some() {
+                "; cap non applicabile (durata/dimensione sorgente sconosciuta)"
             } else {
-                "crf"
+                ""
             };
-            extra_params.insert(param_key.to_string(), serde_json::json!(final_cq));
+
+            let bpp_note = if opts.use_bpp_probe {
+                format!("; bpp sorgente {:.2}", bpp_dst)
+            } else {
+                String::new()
+            };
 
             ResolvedQuality {
                 cq: Some(final_cq),
                 bitrate_kbps: None,
                 extra_params,
-                summary: format!("AUTO (CQ {})", final_cq),
+                summary: format!(
+                    "AUTO (CQ {}; base {}, ris {:+}, fps {:+}, profondità {:+}, complessità {:+}{}{})",
+                    final_cq, base_cq, delta_res, delta_fps, delta_depth, delta_bpp, bpp_note, cap_note
+                ),
             }
         }
     }
+}
+
+/// Bitrate audio consigliato (kbps) in base al codec di destinazione e ai canali sorgente.
+/// `None` per i codec dove non c'è nulla da calcolare (es. FLAC lossless o codec sconosciuti).
+pub fn resolve_audio_bitrate(codec_id: &str, channels: u32) -> Option<u32> {
+    let ch = channels.max(1);
+    match codec_id {
+        "libopus" => Some((ch * 64).clamp(64, 320)),
+        "aac" => Some((ch * 64).clamp(64, 384)),
+        "libmp3lame" => Some(if ch <= 1 { 96 } else { 192 }),
+        _ => None,
+    }
+}
+
+/// Estrae le dimensioni di destinazione dai filtri `scale` presenti sul flusso.
+/// Ritorna `(larghezza, altezza)` dove un lato proporzionale (`-2` o `min(N,ih)`) è `None`.
+pub fn dst_dims_from_filters(filters: &[String]) -> (Option<u32>, Option<u32>) {
+    let scale = filters.iter().find(|f| f.starts_with("scale="));
+    let Some(scale) = scale else {
+        return (None, None);
+    };
+
+    let parse_side = |s: &str| -> Option<u32> {
+        let digits: String = s.chars().filter(|c| c.is_ascii_digit()).collect();
+        digits.parse::<u32>().ok()
+    };
+
+    let parts: Vec<&str> = scale["scale=".len()..].split(':').collect();
+    let w = parts.first().and_then(|s| {
+        if s.trim() == "-2" || s.trim() == "-1" {
+            None
+        } else {
+            parse_side(s)
+        }
+    });
+    let h = parts.get(1).and_then(|s| {
+        if s.trim() == "-2" || s.trim() == "-1" {
+            None
+        } else {
+            parse_side(s)
+        }
+    });
+    (w, h)
+}
+
+/// Applica le modalità di qualità (video + audio) a un job già istanziato.
+/// Usato sia dal pannello del file singolo che dal motore batch.
+/// Ritorna le righe di riepilogo da mostrare nei log.
+pub fn apply_quality_to_job(
+    job: &mut Job,
+    video_mode: &QualityMode,
+    audio_mode: &AudioQualityMode,
+    probe: Option<&crate::probe::ProbeResult>,
+    src_file_size: Option<u64>,
+) -> Vec<String> {
+    let mut summaries = Vec::new();
+
+    // --- Audio: bitrate automatico ---
+    let mut audio_kbps: Option<u32> = None;
+    let mut audio_copy = false;
+    for stream in job.output.streams.iter_mut() {
+        if stream.kind != crate::model::StreamKind::Audio {
+            continue;
+        }
+        match &mut stream.codec {
+            CodecConfig::Encode { id, params } => {
+                let src_audio = probe.and_then(|p| {
+                    p.streams
+                        .iter()
+                        .find(|s| s.kind == crate::model::StreamKind::Audio && s.index == stream.source_index)
+                });
+                let channels = src_audio.and_then(|s| s.channels).unwrap_or(2);
+
+                match audio_mode {
+                    AudioQualityMode::Auto => {
+                        if let Some(kbps) = resolve_audio_bitrate(id, channels) {
+                            params.insert("bitrate".to_string(), serde_json::json!(format!("{}k", kbps)));
+                            summaries.push(format!(
+                                "Audio → bitrate automatico {}k ({} canali, {})",
+                                kbps, channels, id
+                            ));
+                            if audio_kbps.is_none() {
+                                audio_kbps = Some(kbps);
+                            }
+                        }
+                    }
+                    AudioQualityMode::Manual => {
+                        if audio_kbps.is_none() {
+                            audio_kbps = params
+                                .get("bitrate")
+                                .and_then(|v| v.as_str())
+                                .and_then(|s| s.trim_end_matches('k').parse::<u32>().ok());
+                        }
+                    }
+                }
+            }
+            CodecConfig::Copy => audio_copy = true,
+        }
+    }
+    if audio_kbps.is_none() && audio_copy {
+        audio_kbps = Some(192);
+    }
+
+    // --- Video: qualità automatica / preset / fissa ---
+    for stream in job.output.streams.iter_mut() {
+        if stream.kind != crate::model::StreamKind::Video {
+            continue;
+        }
+        let CodecConfig::Encode { id, params } = &mut stream.codec else {
+            continue;
+        };
+        if *video_mode == QualityMode::Manual {
+            continue;
+        }
+
+        let (dst_w, dst_h) = dst_dims_from_filters(&stream.filters);
+        let resolved = resolve_quality(
+            video_mode,
+            probe,
+            dst_w,
+            dst_h,
+            id,
+            src_file_size,
+            audio_kbps,
+        );
+        for (k, v) in resolved.extra_params {
+            params.insert(k, v);
+        }
+        summaries.push(format!("Video ({}) → {}", id, resolved.summary));
+    }
+
+    summaries
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -321,6 +574,10 @@ pub struct BatchProfile {
     pub audio_rule: AudioRule,
     pub subtitle_rule: SubtitleRule,
     pub copy_cover_art: bool,
+    #[serde(default)]
+    pub video_quality: QualityMode,
+    #[serde(default)]
+    pub audio_quality: AudioQualityMode,
 }
 
 impl BatchProfile {
@@ -379,6 +636,8 @@ impl BatchProfile {
             },
             subtitle_rule: SubtitleRule::CopyCompatible,
             copy_cover_art: true,
+            video_quality: QualityMode::Manual,
+            audio_quality: AudioQualityMode::Manual,
         }
     }
 
@@ -395,6 +654,8 @@ impl BatchProfile {
             },
             subtitle_rule: SubtitleRule::Ignore,
             copy_cover_art: false, // Opus muxer rejects cover art streams
+            video_quality: QualityMode::Manual,
+            audio_quality: AudioQualityMode::Manual,
         }
     }
 
@@ -429,6 +690,8 @@ impl BatchProfile {
             },
             subtitle_rule: SubtitleRule::CopyCompatible,
             copy_cover_art: true,
+            video_quality: QualityMode::Manual,
+            audio_quality: AudioQualityMode::Manual,
         }
     }
 
@@ -463,6 +726,8 @@ impl BatchProfile {
             },
             subtitle_rule: SubtitleRule::CopyCompatible,
             copy_cover_art: true,
+            video_quality: QualityMode::Manual,
+            audio_quality: AudioQualityMode::Manual,
         }
     }
 
@@ -474,6 +739,8 @@ impl BatchProfile {
             audio_rule: AudioRule::CopyAll,
             subtitle_rule: SubtitleRule::Ignore,
             copy_cover_art: false,
+            video_quality: QualityMode::Manual,
+            audio_quality: AudioQualityMode::Manual,
         }
     }
 
@@ -540,6 +807,13 @@ impl BatchProfile {
             }
         }
 
+        if self.video_quality != QualityMode::Manual {
+            lines.push(format!("Qualità video: {}", self.video_quality.label()));
+        }
+        if self.audio_quality == AudioQualityMode::Auto {
+            lines.push("Bitrate audio: Automatico (dai canali sorgente)".to_string());
+        }
+
         ProfileSummary { lines, warnings }
     }
 
@@ -549,6 +823,8 @@ impl BatchProfile {
             audio_rule: self.audio_rule.clone(),
             subtitle_rule: self.subtitle_rule.clone(),
             copy_cover_art: self.copy_cover_art,
+            video_quality: self.video_quality.clone(),
+            audio_quality: self.audio_quality,
         }
     }
 }
@@ -854,10 +1130,19 @@ pub fn plan_batch(
 
         used_output_paths.insert(target_path.clone());
 
+        let video_quality = assigned_profile.as_ref().map(|p| &p.video_quality);
         let estimated_output = if state == PlanState::ExistsSkip {
             0
         } else if is_copy_only {
             input_size
+        } else if let Some(QualityMode::Auto(opts)) = video_quality {
+            match opts.size_cap {
+                Some(SizeCap::Megabytes(mb)) => (mb * 1024.0 * 1024.0) as u64,
+                Some(SizeCap::PercentReduction(pct)) => {
+                    (input_size as f64 * (1.0 - pct.clamp(0.0, 99.0) / 100.0)) as u64
+                }
+                None => (input_size as f64 * 0.60) as u64,
+            }
         } else {
             (input_size as f64 * 0.60) as u64
         };
@@ -1366,14 +1651,210 @@ mod profile_tests {
 
     #[test]
     fn test_resolve_quality_tiers() {
-        let q_med = resolve_quality(&QualityMode::Preset(QualityTier::Medium), None, None, None, "libx264", None);
+        let q_med = resolve_quality(&QualityMode::Preset(QualityTier::Medium), None, None, None, "libx264", None, None);
         assert_eq!(q_med.cq, Some(22));
 
-        let q_high = resolve_quality(&QualityMode::Preset(QualityTier::High), None, None, None, "libx264", None);
+        let q_high = resolve_quality(&QualityMode::Preset(QualityTier::High), None, None, None, "libx264", None, None);
         assert_eq!(q_high.cq, Some(18));
 
-        let q_low = resolve_quality(&QualityMode::Preset(QualityTier::Low), None, None, None, "libx264", None);
+        let q_low = resolve_quality(&QualityMode::Preset(QualityTier::Low), None, None, None, "libx264", None, None);
         assert_eq!(q_low.cq, Some(26));
+    }
+
+    #[test]
+    fn test_resolve_quality_auto_size_cap_nvenc_uses_b_v_and_cbr() {
+        use crate::probe::ProbeResult;
+        let probe = ProbeResult {
+            file: PathBuf::from("video.mp4"),
+            duration_s: Some(60.0),
+            format_name: Some("mov,mp4".to_string()),
+            bit_rate: Some(10_000_000),
+            streams: vec![],
+        };
+        let auto_opts = AutoOptions {
+            size_cap: Some(SizeCap::Megabytes(50.0)),
+            use_bpp_probe: false,
+        };
+        let res = resolve_quality(
+            &QualityMode::Auto(auto_opts),
+            Some(&probe),
+            None,
+            None,
+            "hevc_nvenc",
+            None,
+            Some(128),
+        );
+
+        assert!(res.bitrate_kbps.is_some());
+        assert_eq!(res.extra_params.get("b_v"), Some(&serde_json::json!(format!("{}k", res.bitrate_kbps.unwrap()))));
+        assert_eq!(res.extra_params.get("rc"), Some(&serde_json::json!("cbr")));
+        assert_eq!(res.extra_params.get("cq"), Some(&serde_json::Value::Null));
+    }
+
+    #[test]
+    fn test_resolve_quality_auto_amf_uses_cqp() {
+        let res = resolve_quality(&QualityMode::Auto(AutoOptions::default()), None, None, None, "hevc_amf", None, None);
+        assert_eq!(res.extra_params.get("rc"), Some(&serde_json::json!("cqp")));
+        assert_eq!(res.extra_params.get("qp_i"), res.extra_params.get("qp_p"));
+        assert_eq!(res.cq, res.extra_params.get("qp_i").and_then(|v| v.as_u64()).map(|v| v as u32));
+    }
+
+    #[test]
+    fn test_resolve_quality_auto_percent_cap_requires_source_size() {
+        use crate::probe::ProbeResult;
+        let probe = ProbeResult {
+            file: PathBuf::from("video.mp4"),
+            duration_s: Some(60.0),
+            format_name: None,
+            bit_rate: None,
+            streams: vec![],
+        };
+        let auto_opts = AutoOptions {
+            size_cap: Some(SizeCap::PercentReduction(30.0)),
+            use_bpp_probe: false,
+        };
+
+        // Senza dimensione sorgente il cap non è applicabile: fallback su CQ, non su bitrate minimo
+        let res = resolve_quality(
+            &QualityMode::Auto(auto_opts.clone()),
+            Some(&probe),
+            None,
+            None,
+            "libx264",
+            None,
+            None,
+        );
+        assert!(res.bitrate_kbps.is_none());
+        assert!(res.summary.contains("cap non applicabile"));
+
+        // Con la dimensione sorgente il cap produce un bitrate coerente
+        let res = resolve_quality(
+            &QualityMode::Auto(auto_opts),
+            Some(&probe),
+            None,
+            None,
+            "libx264",
+            Some(100 * 1024 * 1024),
+            None,
+        );
+        let kbps = res.bitrate_kbps.expect("cap percentuale applicato");
+        // 70 MB * 8 / 60 s ≈ 9787 kbps (senza audio)
+        assert!(kbps > 9000 && kbps < 10500, "kbps = {}", kbps);
+        assert_eq!(res.extra_params.get("b_v"), Some(&serde_json::json!(format!("{}k", kbps))));
+        assert_eq!(res.extra_params.get("crf"), Some(&serde_json::Value::Null));
+    }
+
+    #[test]
+    fn test_resolve_quality_auto_bpp_probe_respected() {
+        use crate::probe::ProbeResult;
+        let probe = ProbeResult {
+            file: PathBuf::from("video.mp4"),
+            duration_s: Some(60.0),
+            format_name: None,
+            bit_rate: Some(40_000_000),
+            streams: vec![],
+        };
+        let with_bpp = resolve_quality(
+            &QualityMode::Auto(AutoOptions { size_cap: None, use_bpp_probe: true }),
+            Some(&probe),
+            None,
+            None,
+            "libx264",
+            None,
+            None,
+        );
+        let without_bpp = resolve_quality(
+            &QualityMode::Auto(AutoOptions { size_cap: None, use_bpp_probe: false }),
+            Some(&probe),
+            None,
+            None,
+            "libx264",
+            None,
+            None,
+        );
+
+        // Sorgente molto complessa (40 Mbps @ 1080p): il bpp probe abbassa il CQ
+        assert!(with_bpp.cq.unwrap() < without_bpp.cq.unwrap());
+        assert_eq!(without_bpp.cq.unwrap(), 20);
+    }
+
+    #[test]
+    fn test_resolve_quality_manual_is_noop() {
+        let res = resolve_quality(&QualityMode::Manual, None, None, None, "libx264", None, None);
+        assert!(res.extra_params.is_empty());
+    }
+
+    #[test]
+    fn test_apply_quality_to_job_end_to_end() {
+        use crate::model::{CodecConfig, Job, OutStream, StreamKind};
+        use crate::probe::{MediaStream, ProbeResult};
+        use std::collections::HashMap;
+
+        let probe = ProbeResult {
+            file: PathBuf::from("in.mkv"),
+            duration_s: Some(60.0),
+            format_name: None,
+            bit_rate: Some(8_000_000),
+            streams: vec![
+                MediaStream {
+                    index: 0,
+                    kind: StreamKind::Video,
+                    width: Some(3840),
+                    height: Some(2160),
+                    fps: Some(60.0),
+                    pix_fmt: Some("yuv420p10le".to_string()),
+                    ..Default::default()
+                },
+                MediaStream {
+                    index: 1,
+                    kind: StreamKind::Audio,
+                    channels: Some(6),
+                    ..Default::default()
+                },
+            ],
+        };
+
+        let mut job = Job::new("in.mkv", "out.mkv");
+        job.output.streams.push(OutStream::new_encode(
+            StreamKind::Video,
+            0,
+            "libx265",
+            HashMap::new(),
+        ));
+        job.output
+            .streams
+            .push(OutStream::new_encode(StreamKind::Audio, 1, "aac", HashMap::new()));
+
+        let summaries = apply_quality_to_job(
+            &mut job,
+            &QualityMode::Auto(AutoOptions { size_cap: None, use_bpp_probe: true }),
+            &AudioQualityMode::Auto,
+            Some(&probe),
+            None,
+        );
+
+        assert_eq!(summaries.len(), 2);
+        let v = &job.output.streams[0];
+        let CodecConfig::Encode { params, .. } = &v.codec else {
+            panic!("video encode atteso");
+        };
+        // 4K 60fps 10bit: base 24, ris -4, fps -2, depth -2, bpp +6 -> CQ 22
+        assert_eq!(params.get("crf"), Some(&serde_json::json!(22)));
+
+        let a = &job.output.streams[1];
+        let CodecConfig::Encode { id, params } = &a.codec else {
+            panic!("audio encode atteso");
+        };
+        assert_eq!(id, "aac");
+        assert_eq!(params.get("bitrate"), Some(&serde_json::json!("384k")));
+    }
+
+    #[test]
+    fn test_dst_dims_from_filters() {
+        assert_eq!(dst_dims_from_filters(&["scale=-2:'min(1080,ih)'".to_string()]), (None, Some(1080)));
+        assert_eq!(dst_dims_from_filters(&["scale=-2:720".to_string()]), (None, Some(720)));
+        assert_eq!(dst_dims_from_filters(&["scale=1920:1080".to_string()]), (Some(1920), Some(1080)));
+        assert_eq!(dst_dims_from_filters(&[]), (None, None));
     }
 
     #[test]
@@ -1399,6 +1880,7 @@ mod profile_tests {
             Some(1080),
             "libx264",
             Some(100 * 1024 * 1024),
+            None,
         );
 
         assert!(res.bitrate_kbps.is_some());

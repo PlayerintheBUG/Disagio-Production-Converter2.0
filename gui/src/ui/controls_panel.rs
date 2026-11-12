@@ -1,6 +1,7 @@
 use crate::app::{AppMode, FfGuiApp, StreamControlState, SubtitleMode};
 use eframe::egui::{self, Color32, RichText, Slider};
 use ffgui_core::backends::whisper::WhisperBackend;
+use ffgui_core::batch::{AudioQualityMode, AutoOptions, QualityMode, QualityTier, SizeCap};
 use ffgui_core::catalog::{CodecDef, ParamDef, ParamType};
 use ffgui_core::model::StreamKind;
 use std::sync::atomic::Ordering;
@@ -125,12 +126,111 @@ fn render_param(
                     ctrl.selected_preset = None;
                 }
             }
+            ParamType::Str => {
+                let mut current = ctrl
+                    .params
+                    .get(&param.id)
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+
+                ui.horizontal(|ui| {
+                    ui.label(&param.label);
+                    if ui.add(egui::TextEdit::singleline(&mut current).desired_width(120.0)).changed() {
+                        if current.trim().is_empty() {
+                            ctrl.params.remove(&param.id);
+                        } else {
+                            ctrl.params.insert(param.id.clone(), serde_json::json!(current.trim()));
+                        }
+                        ctrl.selected_preset = None;
+                    }
+                });
+            }
         }
 
         if let Some(ref hint) = param.hint {
             ui.small(RichText::new(hint).color(Color32::from_rgb(180, 180, 180)));
         }
     });
+}
+
+/// UI condivisa per la scelta della modalità qualità video:
+/// Manuale (parametri fissi scelti dall'utente), Preset, Fissa o Auto
+/// (con eventuale limite di dimensione: MB massimi o riduzione percentuale).
+pub fn render_quality_mode_ui(ui: &mut egui::Ui, mode: &mut QualityMode) {
+    ui.add_space(4.0);
+    ui.separator();
+    ui.add_space(2.0);
+    ui.label(RichText::new("🎯 Qualità:").strong());
+
+    ui.horizontal(|ui| {
+        if ui.radio(*mode == QualityMode::Manual, "Manuale").clicked() {
+            *mode = QualityMode::Manual;
+        }
+        if ui.radio(matches!(mode, QualityMode::Preset(QualityTier::High)), "Alta").clicked() {
+            *mode = QualityMode::Preset(QualityTier::High);
+        }
+        if ui.radio(matches!(mode, QualityMode::Preset(QualityTier::Medium)), "Media").clicked() {
+            *mode = QualityMode::Preset(QualityTier::Medium);
+        }
+        if ui.radio(matches!(mode, QualityMode::Preset(QualityTier::Low)), "Bassa").clicked() {
+            *mode = QualityMode::Preset(QualityTier::Low);
+        }
+        if ui.radio(matches!(mode, QualityMode::Auto(_)), "Adattiva").clicked() {
+            *mode = QualityMode::Auto(AutoOptions::default());
+        }
+    });
+
+    match mode {
+        QualityMode::Manual => {
+            ui.small(RichText::new("Usa i parametri fissi del codec scelti sopra (CRF/CQ, preset, ecc.)").color(Color32::GRAY));
+        }
+        QualityMode::Preset(_) => {
+            ui.small(RichText::new("Il valore di qualità (CRF/CQ) viene impostato automaticamente dal preset scelto").color(Color32::GRAY));
+        }
+        QualityMode::Fixed { .. } => {}
+        QualityMode::Auto(opts) => {
+            let (mut kind_idx, mut val) = match &opts.size_cap {
+                None => (0usize, 0.0f64),
+                Some(SizeCap::Megabytes(mb)) => (1, *mb),
+                Some(SizeCap::PercentReduction(p)) => (2, *p),
+            };
+
+            ui.horizontal(|ui| {
+                ui.label("Limite dimensione:");
+                egui::ComboBox::from_id_salt("quality_size_cap_kind")
+                    .selected_text(match kind_idx {
+                        0 => "Nessuno",
+                        1 => "Dimensione massima (MB)",
+                        _ => "Riduzione %",
+                    })
+                    .show_ui(ui, |ui| {
+                        ui.selectable_value(&mut kind_idx, 0, "Nessuno");
+                        ui.selectable_value(&mut kind_idx, 1, "Dimensione massima (MB)");
+                        ui.selectable_value(&mut kind_idx, 2, "Riduzione %");
+                    });
+                if kind_idx == 1 {
+                    ui.add(egui::DragValue::new(&mut val).speed(1.0).range(1.0..=1_000_000.0).suffix(" MB"));
+                } else if kind_idx == 2 {
+                    ui.add(egui::DragValue::new(&mut val).speed(1.0).range(1.0..=99.0).suffix("%"));
+                }
+            });
+
+            opts.size_cap = match kind_idx {
+                1 => Some(SizeCap::Megabytes(val.max(1.0))),
+                2 => Some(SizeCap::PercentReduction(val.clamp(1.0, 99.0))),
+                _ => None,
+            };
+
+            ui.checkbox(&mut opts.use_bpp_probe, "Analizza la complessità del sorgente (bpp)");
+            ui.small(
+                RichText::new(
+                    "La qualità (CRF/CQ o bitrate) viene calcolata dal file sorgente: risoluzione, fps, profondità e complessità",
+                )
+                .color(Color32::GRAY),
+            );
+        }
+    }
 }
 
 fn render_video_controls(ui: &mut egui::Ui, app: &mut FfGuiApp) {
@@ -318,6 +418,8 @@ fn render_video_controls(ui: &mut egui::Ui, app: &mut FfGuiApp) {
             for param in &codec_def.params {
                 render_param(ui, ctrl, param, codec_def);
             }
+
+            render_quality_mode_ui(ui, &mut app.settings.video_quality);
         }
     }
 
@@ -406,6 +508,23 @@ fn render_audio_controls(ui: &mut egui::Ui, app: &mut FfGuiApp) {
 
             for param in &codec_def.params {
                 render_param(ui, ctrl, param, codec_def);
+            }
+
+            ui.add_space(4.0);
+            ui.horizontal(|ui| {
+                ui.label(RichText::new("Bitrate:").strong());
+                if ui.radio(app.settings.audio_quality == AudioQualityMode::Manual, "Manuale").clicked() {
+                    app.settings.audio_quality = AudioQualityMode::Manual;
+                }
+                if ui.radio(app.settings.audio_quality == AudioQualityMode::Auto, "Automatico").clicked() {
+                    app.settings.audio_quality = AudioQualityMode::Auto;
+                }
+            });
+            if app.settings.audio_quality == AudioQualityMode::Auto {
+                ui.small(
+                    RichText::new("Bitrate calcolato dai canali della traccia sorgente (es. stereo 128k, 5.1 256k+)")
+                        .color(Color32::GRAY),
+                );
             }
         }
     }

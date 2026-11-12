@@ -49,3 +49,10 @@ values = { crf = 23, preset = "medium", pix_fmt = "yuv420p" }
 id = "bassa"
 label = "Bassa (file piccolo)"
 values = { crf = 28, preset = "fast", pix_fmt = "yuv420p" }
+
+[[param]]
+id = "b_v"
+label = "Bitrate video (es. 1500k, vuoto = automatico)"
+flag = "-b:v"
+type = "string"
+hint = "Imposta un bitrate video fisso; lascia vuoto per CRF/CQ"

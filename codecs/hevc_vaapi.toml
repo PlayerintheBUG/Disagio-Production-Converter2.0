@@ -30,3 +30,10 @@ values = { qp = 25 }
 id = "bassa"
 label = "Bassa qualità"
 values = { qp = 30 }
+
+[[param]]
+id = "b_v"
+label = "Bitrate video (es. 1500k, vuoto = automatico)"
+flag = "-b:v"
+type = "string"
+hint = "Imposta un bitrate video fisso; lascia vuoto per CRF/CQ"
