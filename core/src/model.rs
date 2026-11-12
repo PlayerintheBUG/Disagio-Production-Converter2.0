@@ -207,6 +207,10 @@ pub struct JobTemplate {
     pub audio_rule: AudioRule,
     pub subtitle_rule: SubtitleRule,
     pub copy_cover_art: bool,
+    #[serde(default)]
+    pub video_quality: crate::batch::QualityMode,
+    #[serde(default)]
+    pub audio_quality: crate::batch::AudioQualityMode,
 }
 
 impl JobTemplate {

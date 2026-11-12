@@ -28,13 +28,12 @@ hint = "Più basso = qualità maggiore. La scala non è uguale al CRF di x265"
 
 [[param]]
 id = "b_v"
-label = "Bitrate video"
+label = "Bitrate video (es. 2500k)"
 flag = "-b"
-type = "choice"
-choices = ["2M", "4M", "8M", "12M", "20M"]
+type = "string"
 default = "8M"
 only_if = { param = "rc", in = ["cbr"] }
-hint = "Bitrate video fisso per modalità CBR"
+hint = "Bitrate video fisso per modalità CBR (es. 2500k, 8M)"
 
 [[param]]
 id = "qp"

@@ -557,6 +557,12 @@ impl FfGuiApp {
     }
 
     pub fn build_current_job(&self) -> Option<Job> {
+        self.build_job_with_quality().map(|(job, _)| job)
+    }
+
+    /// Come `build_current_job`, ma ritorna anche le righe di riepilogo della
+    /// qualità applicata (modalità Preset/Fissa/Auto) per il log.
+    pub fn build_job_with_quality(&self) -> Option<(Job, Vec<String>)> {
         let input_path = self.input_path.as_ref()?;
         let output_path = self.output_path.as_ref()?;
 
@@ -605,7 +611,19 @@ impl FfGuiApp {
             job.output.streams.push(out_stream);
         }
 
-        Some(job)
+        let mut quality_summaries = Vec::new();
+        if let Some(probe) = self.probe_result.as_ref() {
+            let src_size = std::fs::metadata(input_path).ok().map(|m| m.len());
+            quality_summaries = ffgui_core::batch::apply_quality_to_job(
+                &mut job,
+                &self.settings.video_quality,
+                &self.settings.audio_quality,
+                Some(probe),
+                src_size,
+            );
+        }
+
+        Some((job, quality_summaries))
     }
 
     pub fn is_stream_hw_encoded(&self, stream: &OutStream) -> bool {
@@ -675,7 +693,7 @@ impl FfGuiApp {
             return;
         }
 
-        let Some(mut job) = self.build_current_job() else {
+        let Some((mut job, quality_lines)) = self.build_job_with_quality() else {
             return;
         };
 
@@ -717,6 +735,9 @@ impl FfGuiApp {
                 self.active_queue_item_id = None;
                 self.logs.clear();
                 self.logs.push((cmd_str, false));
+                for line in &quality_lines {
+                    self.logs.push((line.clone(), false));
+                }
                 self.current_progress = Some(0.0);
                 self.current_speed = None;
                 self.current_fps = None;
@@ -1021,6 +1042,18 @@ impl FfGuiApp {
                         return;
                     }
                     job.output.path = part_path_clone;
+
+                    let src_size = std::fs::metadata(&input).ok().map(|m| m.len());
+                    let quality_lines = ffgui_core::batch::apply_quality_to_job(
+                        &mut job,
+                        &template.video_quality,
+                        &template.audio_quality,
+                        Some(&probe),
+                        src_size,
+                    );
+                    for line in quality_lines {
+                        let _ = tx.send(Event::Log { line, is_stderr: false });
+                    }
 
                     let issues = validate_job(&job, &catalog);
                     if let Some(err) = issues.iter().find(|i| i.is_error()) {
@@ -1780,6 +1813,8 @@ impl FfGuiApp {
             audio_rule: a_rule,
             subtitle_rule: ffgui_core::model::SubtitleRule::CopyCompatible,
             copy_cover_art: true,
+            video_quality: self.settings.video_quality.clone(),
+            audio_quality: self.settings.audio_quality,
         };
 
         self.batch_settings.profiles.insert(MediaKind::Video, prof);

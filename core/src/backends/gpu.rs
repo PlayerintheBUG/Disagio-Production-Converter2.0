@@ -94,6 +94,7 @@ impl GpuBackend {
     ) -> bool {
         let mut cmd = Command::new(ffmpeg_bin);
         cmd.args(["-hide_banner", "-y"]);
+        crate::hide_console_window(&mut cmd);
 
         match hw_type {
             GpuHwType::Nvenc => {
@@ -328,11 +329,20 @@ impl GpuBackend {
     ) -> std::collections::HashMap<String, serde_json::Value> {
         let mut cpu_params = std::collections::HashMap::new();
 
-        // 1. Map quality: cq (nvenc), qp (vaapi), global_quality (qsv) -> crf (cpu)
+        // 1. Preserve explicit video bitrate target (b_v) when present: it must survive
+        //    the fallback, otherwise a size-capped job would silently lose its target.
+        let bitrate_target = gpu_params
+            .get("b_v")
+            .and_then(|v| v.as_str())
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty());
+
+        // 2. Map quality: cq (nvenc), qp (vaapi), global_quality (qsv), qp_i (amf) -> crf (cpu)
         let quality_val = gpu_params
             .get("cq")
             .or_else(|| gpu_params.get("qp"))
             .or_else(|| gpu_params.get("global_quality"))
+            .or_else(|| gpu_params.get("qp_i"))
             .and_then(|v| v.as_f64());
 
         if let Some(q) = quality_val {
@@ -342,9 +352,13 @@ impl GpuBackend {
                 _ => (q.round() as i64).clamp(0, 51),
             };
             cpu_params.insert("crf".to_string(), serde_json::json!(crf));
-        } else {
+        } else if bitrate_target.is_none() {
             let default_crf = if cpu_codec == "libsvtav1" { 28 } else { 23 };
             cpu_params.insert("crf".to_string(), serde_json::json!(default_crf));
+        }
+
+        if let Some(ref b) = bitrate_target {
+            cpu_params.insert("b_v".to_string(), serde_json::json!(b));
         }
 
         // 2. Map preset: p1..p7 (nvenc) -> cpu presets

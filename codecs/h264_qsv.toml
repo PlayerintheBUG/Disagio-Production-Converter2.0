@@ -37,3 +37,10 @@ values = { global_quality = 23, preset = "medium" }
 id = "rapido"
 label = "Veloce"
 values = { global_quality = 28, preset = "faster" }
+
+[[param]]
+id = "b_v"
+label = "Bitrate video (es. 1500k, vuoto = automatico)"
+flag = "-b:v"
+type = "string"
+hint = "Imposta un bitrate video fisso; lascia vuoto per CRF/CQ"

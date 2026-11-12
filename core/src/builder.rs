@@ -163,8 +163,10 @@ impl CommandBuilder {
                                         args.push(n.to_string());
                                     }
                                     serde_json::Value::String(s) => {
-                                        args.push(flag_with_spec);
-                                        args.push(s.clone());
+                                        if !s.is_empty() {
+                                            args.push(flag_with_spec);
+                                            args.push(s.clone());
+                                        }
                                     }
                                     _ => {}
                                 }
@@ -403,6 +405,66 @@ mod tests {
             let next = CommandBuilder::build(&job, &catalog);
             assert_eq!(first, next, "Builder output must be completely deterministic!");
         }
+    }
+
+    #[test]
+    fn test_bitrate_mode_emits_b_v_and_suppresses_crf() {
+        let catalog = Catalog::load_default(false);
+        let mut job = Job::new("in.mkv", "out.mkv");
+        let mut params = HashMap::new();
+        params.insert("crf".to_string(), serde_json::Value::Null);
+        params.insert("b_v".to_string(), serde_json::json!("1500k"));
+        job.output
+            .streams
+            .push(OutStream::new_encode(StreamKind::Video, 0, "libx264", params));
+
+        let args = CommandBuilder::build(&job, &catalog);
+        let joined = args.join(" ");
+
+        assert!(joined.contains("-b:v:0 1500k"), "{}", joined);
+        assert!(!joined.contains("crf"), "il CRF deve essere soppresso in modalità bitrate: {}", joined);
+    }
+
+    #[test]
+    fn test_nvenc_bitrate_mode_uses_cbr_without_bv0_injection() {
+        let catalog = Catalog::load_default(false);
+        let mut job = Job::new("in.mkv", "out.mkv");
+        let mut params = HashMap::new();
+        params.insert("rc".to_string(), serde_json::json!("cbr"));
+        params.insert("cq".to_string(), serde_json::Value::Null);
+        params.insert("b_v".to_string(), serde_json::json!("2500k"));
+        job.output
+            .streams
+            .push(OutStream::new_encode(StreamKind::Video, 0, "hevc_nvenc", params));
+
+        let args = CommandBuilder::build(&job, &catalog);
+        let joined = args.join(" ");
+
+        assert!(joined.contains("-rc:v:0 cbr"), "{}", joined);
+        assert!(joined.contains("-b:v:0 2500k"), "{}", joined);
+        assert!(!joined.contains("cq"), "il CQ deve essere soppresso: {}", joined);
+        // il builder non deve iniettare -b:v 0 quando il bitrate è già esplicito
+        assert!(!joined.contains("-b:v:0 0"), "{}", joined);
+    }
+
+    #[test]
+    fn test_amf_cqp_mode_emits_qp_i_qp_p() {
+        let catalog = Catalog::load_default(false);
+        let mut job = Job::new("in.mkv", "out.mkv");
+        let mut params = HashMap::new();
+        params.insert("rc".to_string(), serde_json::json!("cqp"));
+        params.insert("qp_i".to_string(), serde_json::json!(24));
+        params.insert("qp_p".to_string(), serde_json::json!(24));
+        job.output
+            .streams
+            .push(OutStream::new_encode(StreamKind::Video, 0, "hevc_amf", params));
+
+        let args = CommandBuilder::build(&job, &catalog);
+        let joined = args.join(" ");
+
+        assert!(joined.contains("-rc:v:0 cqp"), "{}", joined);
+        assert!(joined.contains("-qp_i:v:0 24"), "{}", joined);
+        assert!(joined.contains("-qp_p:v:0 24"), "{}", joined);
     }
 
     #[test]

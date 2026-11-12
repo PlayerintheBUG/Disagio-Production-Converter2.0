@@ -93,13 +93,19 @@ L'eseguibile compilato si troverà in `target/release/ffgui`.
 5. **Filtri e Taglio**: Seleziona una risoluzione proporzionale (es. 1080p, 720p) o specifica inizio (`-ss`) e durata (`-t`).
 6. **Comando Live**: Il comando esatto di FFmpeg si aggiorna in tempo reale con escaping shell affidabile e copia con un click.
 7. **Scrittura Atomica `.part`**: I file vengono salvati inizialmente come `.part` e rinominati solo al termine con successo per evitare file corrotti.
+8. **Modalità Qualità (file singolo e batch)**: Accanto ai parametri fissi del codec (CRF/CQ, preset, bitrate manuale), è possibile scegliere:
+   - **Manuale**: usa i parametri scelti nell'interfaccia (comportamento classico, qualità fissa sotto controllo dell'utente).
+   - **Preset Alta/Media/Bassa**: valore di qualità impostato automaticamente dal preset.
+   - **Adattiva (Auto)**: il programma sceglie solo codec e contenitore, e calcola da sé tutti i parametri (CRF/CQ) analizzando il sorgente: risoluzione di destinazione, fps, profondità colore e complessità (bpp opzionale). Con **limite di dimensione** opzionale: **dimensione massima in MB** oppure **riduzione percentuale** — in quel caso viene calcolato e impostato un bitrate video tale da rispettare il target (sottraendo l'audio reale).
+   - **Audio automatico**: bitrate calcolato dai canali della traccia sorgente (es. stereo 128k, 5.1 256k+) per Opus/AAC/MP3.
+   - La qualità risolta è sempre visibile nel log e nell'anteprima del comando (es. `AUTO (CQ 22; base 24, ris -4, fps -2, ...)`).
 
 ### 3. Conversione Batch a 2 Colonne (`[ 📁 Conversione Batch ]`)
 Il tab Batch implementa l'algoritmo intelligente di conversione e archiviazione:
 1. **Sorgente con Chip Estensioni**: Seleziona una cartella di origine (o trascinala nella finestra). Trova e visualizza chip interattivi per ogni estensione con conteggio file, permettendo di abilitare/disabilitare estensioni con un click.
 2. **Profili per MediaKind**:
-   - **Video**: Preset automatici (`Archivio H.265/AV1`, `Compatibile H.264`, o `Copia da Principale`), con calcolo automatico CQ in base a risoluzione e complessità.
-   - **Audio**: Opzioni rapide per copia traccia o ricodifica (Opus/AAC).
+   - **Video**: Preset automatici (`Archivio H.265/AV1`, `Compatibile H.264`, o `Copia da Principale`), con modalità qualità configurabile (Manuale/Preset/Fissa/Adattiva con limite di dimensione) e calcolo automatico CQ in base a risoluzione e complessità.
+   - **Audio**: Opzioni rapide per copia traccia o ricodifica (Opus/AAC), con bitrate manuale o automatico.
    - **Immagini**: Conversione di cartelle di foto in WebP/JPG/PNG.
    - **File non multimediali**: Opzione per copiare copertine, file `.srt` e `.nfo`.
 3. **Destinazione e Naming Template**:
