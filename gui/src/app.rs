@@ -1267,6 +1267,8 @@ impl FfGuiApp {
                 .unwrap_or(0)
         );
 
+        let mut transcribe_id: Option<usize> = None;
+
         let srt_output = if let Some(ref custom_sub) = self.subtitle_options.custom_sub_file {
             custom_sub.clone()
         } else {
@@ -1287,7 +1289,7 @@ impl FfGuiApp {
             // Step 1: Extract Audio (Bug 3.1: pass selected_audio_track)
             let audio_track = self.subtitle_options.selected_audio_track;
             let extract_args = FfmpegBackend::build_extract_audio_args(input_path, &temp_wav, audio_track);
-            self.queue.push_with_duration(
+            let extract_id = self.queue.push_with_duration(
                 format!("1. Estrazione audio #{} per Whisper ({})", audio_track, input_path.file_name().unwrap_or_default().to_string_lossy()),
                 StepKind::FfmpegArgs {
                     args: extract_args,
@@ -1306,11 +1308,12 @@ impl FfGuiApp {
                 compute_type: self.subtitle_options.compute_type.clone(),
                 vad_filter: self.subtitle_options.vad_filter,
             };
-            self.queue.push_with_duration(
+            transcribe_id = Some(self.queue.push_dependent(
                 format!("2. Trascrizione Whisper ({})", self.subtitle_options.model),
                 StepKind::Transcribe(transcribe_job),
                 duration_s,
-            );
+                extract_id,
+            ));
 
             srt_out
         };
@@ -1325,14 +1328,27 @@ impl FfGuiApp {
                     lang_opt.as_deref(),
                     true,
                 );
-                self.queue.push_with_duration(
-                    format!("3. Mux sottotitoli in {:?}", output_path.file_name().unwrap_or_default()),
-                    StepKind::FfmpegArgs {
-                        args: mux_args,
-                        duration_s,
-                    },
+                let mux_step = StepKind::FfmpegArgs {
+                    args: mux_args,
                     duration_s,
-                );
+                };
+                match transcribe_id {
+                    Some(dep) => {
+                        self.queue.push_dependent(
+                            format!("3. Mux sottotitoli in {:?}", output_path.file_name().unwrap_or_default()),
+                            mux_step,
+                            duration_s,
+                            dep,
+                        );
+                    }
+                    None => {
+                        self.queue.push_with_duration(
+                            format!("3. Mux sottotitoli in {:?}", output_path.file_name().unwrap_or_default()),
+                            mux_step,
+                            duration_s,
+                        );
+                    }
+                }
             }
             SubtitleMode::BurnIntoVideo => {
                 let mut burn_job = Job::new(input_path, output_path);
@@ -1368,15 +1384,28 @@ impl FfGuiApp {
                 burn_job.output.streams.push(OutStream::new_copy(StreamKind::Audio, audio_src));
 
                 // Bug 3.2 & 3.7: Queue BurnSubtitles step for execution-time safe copy
-                self.queue.push_with_duration(
-                    format!("3. Codifica video con sottotitoli impressi in {:?}", output_path.file_name().unwrap_or_default()),
-                    StepKind::BurnSubtitles {
-                        job: Box::new(burn_job),
-                        srt: srt_output,
-                        pipeline_id,
-                    },
-                    duration_s,
-                );
+                let burn_step = StepKind::BurnSubtitles {
+                    job: Box::new(burn_job),
+                    srt: srt_output,
+                    pipeline_id,
+                };
+                match transcribe_id {
+                    Some(dep) => {
+                        self.queue.push_dependent(
+                            format!("3. Codifica video con sottotitoli impressi in {:?}", output_path.file_name().unwrap_or_default()),
+                            burn_step,
+                            duration_s,
+                            dep,
+                        );
+                    }
+                    None => {
+                        self.queue.push_with_duration(
+                            format!("3. Codifica video con sottotitoli impressi in {:?}", output_path.file_name().unwrap_or_default()),
+                            burn_step,
+                            duration_s,
+                        );
+                    }
+                }
             }
             SubtitleMode::TranscribeOnly => {}
         }

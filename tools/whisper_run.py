@@ -10,6 +10,27 @@ import json
 import os
 import sys
 
+def load_pcm_wav_16k_mono(path: str):
+    try:
+        import wave
+        import numpy as np
+    except ImportError:
+        return None
+    try:
+        with wave.open(path, "rb") as w:
+            if w.getcomptype() != "NONE":
+                return None
+            if w.getsampwidth() != 2 or w.getframerate() != 16000:
+                return None
+            channels = w.getnchannels()
+            frames = w.readframes(w.getnframes())
+    except (wave.Error, EOFError, OSError):
+        return None
+    audio = np.frombuffer(frames, dtype=np.int16).astype(np.float32) / 32768.0
+    if channels > 1:
+        audio = audio.reshape(-1, channels).mean(axis=1)
+    return audio
+
 def ts(seconds: float, sep: str) -> str:
     ms = int(round(seconds * 1000))
     h, ms = divmod(ms, 3600000)
@@ -70,9 +91,13 @@ def main():
 
     lang = args.language if args.language and args.language.lower() != "auto" else None
 
+    audio_input = load_pcm_wav_16k_mono(args.audio)
+    if audio_input is None:
+        audio_input = args.audio
+
     sys.stderr.write("Inizio trascrizione audio...\n")
     segments_gen, info = model.transcribe(
-        args.audio,
+        audio_input,
         language=lang,
         vad_filter=args.vad,
     )
