@@ -23,6 +23,31 @@ def format_timestamp_srt(seconds: float) -> str:
 def format_timestamp_vtt(seconds: float) -> str:
     return ts(seconds, ".")
 
+def apply_pyav_compat_shim():
+    """Work around faster-whisper (<= 1.2.1) incompatibility with PyAV >= 19.
+
+    PyAV 19.0.0 removed the `metadata_errors` (and `metadata_encoding`)
+    arguments of av.open(), but faster-whisper still passes them, so every
+    transcription fails with:
+        TypeError: open() got an unexpected keyword argument 'metadata_errors'
+    Wrap av.open to strip the removed kwargs when running on PyAV >= 19.
+    """
+    try:
+        import av
+        major = int(str(av.__version__).split(".")[0])
+    except Exception:
+        return
+    if major < 19:
+        return
+    orig_open = av.open
+
+    def open_compat(*a, **kw):
+        kw.pop("metadata_errors", None)
+        kw.pop("metadata_encoding", None)
+        return orig_open(*a, **kw)
+
+    av.open = open_compat
+
 def write_srt(segments, output_path: str):
     with open(output_path, "w", encoding="utf-8") as f:
         for i, seg in enumerate(segments, start=1):
@@ -60,6 +85,8 @@ def main():
     except ImportError:
         sys.stderr.write("faster-whisper is not installed in this environment.\n")
         sys.exit(2)
+
+    apply_pyav_compat_shim()
 
     compute_type = args.compute_type
     if compute_type == "default":

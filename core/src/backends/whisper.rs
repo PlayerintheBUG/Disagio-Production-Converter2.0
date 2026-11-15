@@ -34,7 +34,9 @@ impl WhisperBackend {
         }
 
         let mut cmd = Command::new(python);
-        cmd.args(["-c", "import faster_whisper"]);
+        // Also require a PyAV version compatible with faster-whisper: PyAV 19
+        // removed `metadata_errors` from av.open() and breaks transcription.
+        cmd.args(["-c", "import faster_whisper\nimport av\nassert int(av.__version__.split('.')[0]) < 19"]);
         crate::hide_console_window(&mut cmd);
         cmd.output()
             .map(|out| out.status.success())
@@ -141,7 +143,10 @@ impl WhisperBackend {
             let python_bin = Self::python_executable();
             let mut pip_cmd = Command::new(&python_bin);
             pip_cmd
-                .args(["-m", "pip", "install", "--upgrade", "pip", "faster-whisper"])
+                // Pin av<19: PyAV 19.0.0 removed the `metadata_errors` argument of
+                // av.open() which faster-whisper (<= 1.2.1) still passes, breaking
+                // every transcription (see SYSTRAN/faster-whisper#1495).
+                .args(["-m", "pip", "install", "--upgrade", "pip", "faster-whisper", "av>=11,<19"])
                 .stdout(Stdio::piped())
                 .stderr(Stdio::piped());
             crate::hide_console_window(&mut pip_cmd);
