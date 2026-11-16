@@ -1,0 +1,43 @@
+id = "dsd_lsbf"
+kind = "audio"
+label = "DSD (Direct Stream Digital)"
+is_default = false
+containers = ["dsf", "dff", "mkv"]
+
+[[param]]
+id = "format"
+label = "Formato DSD"
+flag = ""
+type = "choice"
+choices = ["dsd_lsbf", "dsd_msbf"]
+default = "dsd_lsbf"
+hint = "Little-endian o Big-endian DSD"
+
+[[param]]
+id = "rate"
+label = "Frequenza di campionamento"
+flag = "-ar"
+type = "choice"
+choices = ["44100", "88200", "176400", "352800", "705600"]
+default = "44100"
+hint = "DSD64 (44.1kHz), DSD128 (88.2kHz), DSD256 (176.4kHz), DSD512 (352.8kHz), DSD1024 (705.6kHz)"
+
+[[preset]]
+id = "dsd64"
+label = "DSD64 (Standard)"
+values = { format = "dsd_lsbf", rate = "44100" }
+
+[[preset]]
+id = "dsd128"
+label = "DSD128 (Alta risoluzione)"
+values = { format = "dsd_lsbf", rate = "88200" }
+
+[[preset]]
+id = "dsd256"
+label = "DSD256 (Mastering)"
+values = { format = "dsd_lsbf", rate = "176400" }
+
+[[preset]]
+id = "dsd512"
+label = "DSD512 (Ultra HD)"
+values = { format = "dsd_lsbf", rate = "352800" }

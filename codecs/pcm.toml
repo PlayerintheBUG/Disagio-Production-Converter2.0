@@ -1,0 +1,34 @@
+id = "pcm_s16le"
+kind = "audio"
+label = "PCM 16-bit (Non compresso)"
+is_default = false
+containers = ["wav", "mkv", "mov", "avi", "flac"]
+
+[[param]]
+id = "bits"
+label = "Profondit\u00e0 bit"
+flag = ""
+type = "choice"
+choices = ["pcm_s16le", "pcm_s24le", "pcm_s32le", "pcm_f32le", "pcm_f64le"]
+default = "pcm_s16le"
+hint = "Seleziona la profondit\u00e0 bit: 16/24/32-bit intero o 32/64-bit float"
+
+[[preset]]
+id = "cd_quality"
+label = "Qualit\u00e0 CD (16-bit)"
+values = { bits = "pcm_s16le" }
+
+[[preset]]
+id = "studio_24"
+label = "Studio 24-bit"
+values = { bits = "pcm_s24le" }
+
+[[preset]]
+id = "float_32"
+label = "Float 32-bit"
+values = { bits = "pcm_f32le" }
+
+[[preset]]
+id = "float_64"
+label = "Float 64-bit (Mastering)"
+values = { bits = "pcm_f64le" }

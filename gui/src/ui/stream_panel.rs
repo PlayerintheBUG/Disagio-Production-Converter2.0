@@ -63,7 +63,6 @@ pub fn render(ui: &mut egui::Ui, app: &mut FfGuiApp) {
             let caps = ffgui_core::containers::container_caps(out_ext);
 
             egui::ScrollArea::vertical()
-                .max_height(250.0)
                 .show(ui, |ui| {
                     for (i, stream) in probe.streams.iter().enumerate() {
                         let unsupported_warning = if stream.kind == StreamKind::CoverArt && !caps.cover_art {

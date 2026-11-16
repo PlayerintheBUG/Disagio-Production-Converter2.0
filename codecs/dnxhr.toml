@@ -1,0 +1,62 @@
+id = "dnxhr"
+kind = "video"
+label = "DNxHR (Avid)"
+is_default = false
+containers = ["mov", "mxf"]
+
+[[param]]
+id = "profile"
+label = "Profilo DNxHR"
+flag = "-profile"
+type = "choice"
+choices = ["dnxhr_lb", "dnxhr_sq", "dnxhr_hq", "dnxhr_hqx", "dnxhr_444"]
+default = "dnxhr_hq"
+hint = "LB (Light), SQ (Standard), HQ (High Quality), HQX (Mastering), 444 (4:4:4)"
+
+[[param]]
+id = "bitrate"
+label = "Bitrate"
+flag = "-b"
+type = "choice"
+choices = ["80M", "100M", "145M", "220M", "440M"]
+default = "145M"
+hint = "Bitrate in Mbps: 80, 100, 145, 220, 440"
+
+[[param]]
+id = "pix_fmt"
+label = "Formato pixel"
+flag = "-pix_fmt"
+type = "choice"
+choices = ["yuv422p10le", "yuv444p10le", "yuva444p10le"]
+default = "yuv422p10le"
+hint = "4:2:2 per LB/SQ/HQ, 4:4:4 per HQX/444"
+
+[[preset]]
+id = "lb"
+label = "DNxHR LB (80 Mbps)"
+values = { profile = "dnxhr_lb", bitrate = "80M", pix_fmt = "yuv422p10le" }
+
+[[preset]]
+id = "sq"
+label = "DNxHR SQ (100 Mbps)"
+values = { profile = "dnxhr_sq", bitrate = "100M", pix_fmt = "yuv422p10le" }
+
+[[preset]]
+id = "hq"
+label = "DNxHR HQ (145 Mbps)"
+values = { profile = "dnxhr_hq", bitrate = "145M", pix_fmt = "yuv422p10le" }
+
+[[preset]]
+id = "hqx"
+label = "DNxHR HQX (220 Mbps)"
+values = { profile = "dnxhr_hqx", bitrate = "220M", pix_fmt = "yuv444p10le" }
+
+[[preset]]
+id = "444"
+label = "DNxHR 444 (440 Mbps)"
+values = { profile = "dnxhr_444", bitrate = "440M", pix_fmt = "yuva444p10le" }
+
+[[rule]]
+when = { param = "profile", in = ["dnxhr_444"] }
+unless = { param = "pix_fmt", in = ["yuv444p10le", "yuva444p10le"] }
+then = { warn = "Il profilo 444 richiede formato pixel 4:4:4" }

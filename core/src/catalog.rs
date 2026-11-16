@@ -520,9 +520,10 @@ mod tests {
 
             args.push(out_file.to_string_lossy().to_string());
 
-            let status = std::process::Command::new("ffmpeg")
-                .args(&args)
-                .status();
+            let mut cmd = std::process::Command::new("ffmpeg");
+            cmd.args(&args);
+            crate::hide_console_window(&mut cmd);
+            let status = cmd.status();
 
             if let Ok(st) = status {
                 assert!(st.success(), "Failed encoding synthetic test sample for codec: {}", codec.id);

@@ -1,0 +1,67 @@
+id = "prores_aw"
+kind = "video"
+label = "Apple ProRes (AW)"
+is_default = false
+containers = ["mov", "mkv"]
+
+[[param]]
+id = "profile"
+label = "Profilo ProRes"
+flag = "-profile"
+type = "choice"
+choices = ["proxy", "lt", "standard", "hq", "4444", "4444xq"]
+default = "standard"
+hint = "Proxy, LT, Standard, HQ, 4444 (con alfa), 4444XQ (alta qualit\u00e0)"
+
+[[param]]
+id = "pix_fmt"
+label = "Formato pixel"
+flag = "-pix_fmt"
+type = "choice"
+choices = ["yuv422p10le", "yuv444p10le", "yuva444p10le"]
+default = "yuv422p10le"
+hint = "4:2:2 per proxy/lt/standard/hq, 4:4:4 per 4444/4444xq"
+
+[[param]]
+id = "alpha"
+label = "Abilita canale alfa"
+flag = ""
+type = "choice"
+choices = ["none", "auto"]
+default = "none"
+hint = "Abilita il canale alfa per i profili 4444"
+
+[[preset]]
+id = "proxy"
+label = "ProRes Proxy"
+values = { profile = "proxy", pix_fmt = "yuv422p10le", alpha = "none" }
+
+[[preset]]
+id = "lt"
+label = "ProRes LT"
+values = { profile = "lt", pix_fmt = "yuv422p10le", alpha = "none" }
+
+[[preset]]
+id = "standard"
+label = "ProRes Standard"
+values = { profile = "standard", pix_fmt = "yuv422p10le", alpha = "none" }
+
+[[preset]]
+id = "hq"
+label = "ProRes HQ"
+values = { profile = "hq", pix_fmt = "yuv422p10le", alpha = "none" }
+
+[[preset]]
+id = "4444"
+label = "ProRes 4444"
+values = { profile = "4444", pix_fmt = "yuva444p10le", alpha = "auto" }
+
+[[preset]]
+id = "4444xq"
+label = "ProRes 4444 XQ (Mastering)"
+values = { profile = "4444xq", pix_fmt = "yuva444p10le", alpha = "auto" }
+
+[[rule]]
+when = { param = "profile", in = ["4444", "4444xq"] }
+unless = { param = "pix_fmt", in = ["yuv444p10le", "yuva444p10le"] }
+then = { warn = "I profili 4444 richiedono formato 4:4:4" }

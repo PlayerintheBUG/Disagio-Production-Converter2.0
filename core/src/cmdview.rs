@@ -565,28 +565,31 @@ mod tests {
     // --- equivalenza con ffmpeg vero -----------------------------------------------------
 
     fn md5_of(path: &Path, map: &str) -> String {
-        let out = Command::new("ffmpeg")
-            .args(["-v", "error", "-nostdin", "-i"])
+        let mut cmd = std::process::Command::new("ffmpeg");
+        cmd.args(["-v", "error", "-nostdin", "-i"])
             .arg(path)
-            .args(["-map", map, "-f", "md5", "-"])
-            .output()
-            .expect("ffmpeg non trovato nel PATH");
+            .args(["-map", map, "-f", "md5", "-"]);
+        crate::hide_console_window(&mut cmd);
+        let out = cmd.output().expect("ffmpeg non trovato nel PATH");
         String::from_utf8_lossy(&out.stdout).trim().to_string()
     }
 
     #[test]
     fn compatto_ed_esatto_producono_lo_stesso_risultato() {
-        let ok = Command::new("ffmpeg").arg("-version").output().map(|o| o.status.success()).unwrap_or(false);
+        let mut cmd_check = std::process::Command::new("ffmpeg");
+        cmd_check.arg("-version");
+        crate::hide_console_window(&mut cmd_check);
+        let ok = cmd_check.output().map(|o| o.status.success()).unwrap_or(false);
         assert!(ok, "ffmpeg non trovato nel PATH: il test di equivalenza ne ha bisogno");
 
         let dir = tempfile::tempdir().unwrap();
         let src = dir.path().join("in.mkv");
-        let st = Command::new("ffmpeg")
-            .args(["-v", "error", "-nostdin", "-f", "lavfi", "-i", "testsrc2=d=1:s=160x120:r=25"])
+        let mut cmd_gen = std::process::Command::new("ffmpeg");
+        cmd_gen.args(["-v", "error", "-nostdin", "-f", "lavfi", "-i", "testsrc2=d=1:s=160x120:r=25"])
             .args(["-f", "lavfi", "-i", "sine=d=1", "-c:v", "mpeg4", "-c:a", "aac", "-y"])
-            .arg(&src)
-            .status()
-            .unwrap();
+            .arg(&src);
+        crate::hide_console_window(&mut cmd_gen);
+        let st = cmd_gen.status().unwrap();
         assert!(st.success());
 
         let catalog = Catalog::load_default(false);
@@ -607,7 +610,10 @@ mod tests {
         let compact_args = c.to_args(src.to_str().unwrap(), out_compact.to_str().unwrap());
 
         for args in [&exact, &compact_args] {
-            let st = Command::new("ffmpeg").args(["-v", "error", "-nostdin"]).args(args).status().unwrap();
+            let mut cmd_test = std::process::Command::new("ffmpeg");
+            cmd_test.args(["-v", "error", "-nostdin"]).args(args);
+            crate::hide_console_window(&mut cmd_test);
+            let st = cmd_test.status().unwrap();
             assert!(st.success(), "ffmpeg ha fallito con: {:?}", args);
         }
         assert_eq!(md5_of(&out_exact, "0:v"), md5_of(&out_compact, "0:v"));

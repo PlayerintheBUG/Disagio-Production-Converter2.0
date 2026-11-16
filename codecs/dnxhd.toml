@@ -1,0 +1,52 @@
+id = "dnxhd"
+kind = "video"
+label = "DNxHD (Avid Legacy)"
+is_default = false
+containers = ["mov", "mxf"]
+
+[[param]]
+id = "profile"
+label = "Profilo DNxHD"
+flag = ""
+type = "choice"
+choices = ["dnxhd_1080p", "dnxhd_720p", "dnxhd_1080i", "dnxhd_720i"]
+default = "dnxhd_1080p"
+hint = "Profilo predefinito per risoluzione e interlacciamento"
+
+[[param]]
+id = "bitrate"
+label = "Bitrate"
+flag = "-b"
+type = "choice"
+choices = ["36M", "75M", "115M", "150M", "185M", "220M"]
+default = "115M"
+hint = "Bitrate in Mbps per DNxHD"
+
+[[param]]
+id = "pix_fmt"
+label = "Formato pixel"
+flag = "-pix_fmt"
+type = "choice"
+choices = ["yuv422p10le", "yuv422p"]
+default = "yuv422p10le"
+hint = "10-bit per qualit\u00e0 professionale"
+
+[[preset]]
+id = "1080p_115"
+label = "DNxHD 1080p (115 Mbps)"
+values = { profile = "dnxhd_1080p", bitrate = "115M", pix_fmt = "yuv422p10le" }
+
+[[preset]]
+id = "720p_115"
+label = "DNxHD 720p (115 Mbps)"
+values = { profile = "dnxhd_720p", bitrate = "115M", pix_fmt = "yuv422p10le" }
+
+[[preset]]
+id = "1080p_185"
+label = "DNxHD 1080p (185 Mbps - Mastering)"
+values = { profile = "dnxhd_1080p", bitrate = "185M", pix_fmt = "yuv422p10le" }
+
+[[preset]]
+id = "720p_75"
+label = "DNxHD 720p (75 Mbps)"
+values = { profile = "dnxhd_720p", bitrate = "75M", pix_fmt = "yuv422p10le" }

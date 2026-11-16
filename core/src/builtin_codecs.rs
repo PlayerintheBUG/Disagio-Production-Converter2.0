@@ -7,6 +7,11 @@ pub static BUILTIN_CODECS: &[(&str, &str)] = &[
     ("flac", include_str!("../../codecs/flac.toml")),
     ("libmp3lame", include_str!("../../codecs/libmp3lame.toml")),
     ("prores_ks", include_str!("../../codecs/prores_ks.toml")),
+    ("prores_aw", include_str!("../../codecs/prores_aw.toml")),
+    ("dnxhr", include_str!("../../codecs/dnxhr.toml")),
+    ("dnxhd", include_str!("../../codecs/dnxhd.toml")),
+    ("pcm_s16le", include_str!("../../codecs/pcm.toml")),
+    ("dsd_lsbf", include_str!("../../codecs/dsd.toml")),
     ("libwebp", include_str!("../../codecs/libwebp.toml")),
     // GPU Encoders (CUDA/NVENC priority, then QSV, AMF, VAAPI)
     ("av1_nvenc", include_str!("../../codecs/av1_nvenc.toml")),

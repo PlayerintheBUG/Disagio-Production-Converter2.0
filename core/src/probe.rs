@@ -240,8 +240,8 @@ mod tests {
         let sample_path = temp_dir.path().join("test_sample.mkv");
 
         // Generate a 1-second sample using ffmpeg lavfi
-        let status = Command::new("ffmpeg")
-            .args([
+        let mut cmd = Command::new("ffmpeg");
+        cmd.args([
                 "-y",
                 "-hide_banner",
                 "-f",
@@ -259,9 +259,9 @@ mod tests {
                 "-c:a",
                 "pcm_s16le",
             ])
-            .arg(&sample_path)
-            .status()
-            .expect("ffmpeg lavfi execution failed");
+            .arg(&sample_path);
+        crate::hide_console_window(&mut cmd);
+        let status = cmd.status().expect("ffmpeg lavfi execution failed");
 
         assert!(status.success(), "Failed to generate synthetic test file");
 
