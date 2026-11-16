@@ -4,6 +4,15 @@ label = "MP3 (LAME)"
 containers = ["mp3", "mkv"]
 
 [[param]]
+id = "sample_rate"
+label = "Frequenza di campionamento"
+flag = "-ar"
+type = "choice"
+choices = ["8000", "16000", "22050", "32000", "44100", "48000"]
+default = "44100"
+hint = "MP3 supporta: 8k, 16k, 22.05k, 32k, 44.1k, 48kHz"
+
+[[param]]
 id = "rate_control"
 label = "Controllo bitrate"
 flag = ""
@@ -36,19 +45,29 @@ only_if = { param = "rate_control", value = "cbr" }
 [[preset]]
 id = "v0"
 label = "V0 Estrema qualità (VBR)"
-values = { rate_control = "vbr", qscale = 0 }
+values = { rate_control = "vbr", qscale = 0, sample_rate = "44100" }
 
 [[preset]]
 id = "v2"
 label = "V2 Standard consigliato (VBR)"
-values = { rate_control = "vbr", qscale = 2 }
+values = { rate_control = "vbr", qscale = 2, sample_rate = "44100" }
 
 [[preset]]
 id = "cbr320"
 label = "CBR 320 kbps"
-values = { rate_control = "cbr", bitrate = "320k" }
+values = { rate_control = "cbr", bitrate = "320k", sample_rate = "44100" }
 
 [[preset]]
 id = "cbr192"
 label = "CBR 192 kbps"
-values = { rate_control = "cbr", bitrate = "192k" }
+values = { rate_control = "cbr", bitrate = "192k", sample_rate = "44100" }
+
+[[preset]]
+id = "cd_quality"
+label = "Qualità CD (44.1kHz, V2)"
+values = { rate_control = "vbr", qscale = 2, sample_rate = "44100" }
+
+[[preset]]
+id = "studio_48"
+label = "Studio (48kHz, V2)"
+values = { rate_control = "vbr", qscale = 2, sample_rate = "48000" }

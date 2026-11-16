@@ -4,6 +4,15 @@ label = "FLAC (Lossless)"
 containers = ["flac", "mka", "mkv", "ogg"]
 
 [[param]]
+id = "sample_rate"
+label = "Frequenza di campionamento"
+flag = "-ar"
+type = "choice"
+choices = ["8000", "16000", "22050", "32000", "44100", "48000", "88200", "96000", "192000"]
+default = "44100"
+hint = "Frequenze standard: 8k, 16k, 22.05k, 32k, 44.1k, 48k, 88.2k, 96k, 192kHz"
+
+[[param]]
 id = "compression_level"
 label = "Livello di compressione"
 flag = "-compression_level"
@@ -16,14 +25,34 @@ hint = "La qualità è sempre lossless identica; livelli più alti impiegano pi�
 [[preset]]
 id = "veloce"
 label = "Compressione veloce"
-values = { compression_level = 3 }
+values = { compression_level = 3, sample_rate = "44100" }
 
 [[preset]]
 id = "standard"
 label = "Compressione standard"
-values = { compression_level = 5 }
+values = { compression_level = 5, sample_rate = "44100" }
 
 [[preset]]
 id = "massima"
 label = "Compressione massima"
-values = { compression_level = 8 }
+values = { compression_level = 8, sample_rate = "44100" }
+
+[[preset]]
+id = "cd_quality"
+label = "Qualità CD (44.1kHz)"
+values = { compression_level = 5, sample_rate = "44100" }
+
+[[preset]]
+id = "studio_48"
+label = "Studio (48kHz)"
+values = { compression_level = 5, sample_rate = "48000" }
+
+[[preset]]
+id = "high_res_96"
+label = "Alta risoluzione (96kHz)"
+values = { compression_level = 5, sample_rate = "96000" }
+
+[[preset]]
+id = "high_res_192"
+label = "Mastering (192kHz)"
+values = { compression_level = 5, sample_rate = "192000" }

@@ -5,6 +5,15 @@ is_default = false
 containers = ["wav", "mkv", "mov", "avi", "flac"]
 
 [[param]]
+id = "sample_rate"
+label = "Frequenza di campionamento"
+flag = "-ar"
+type = "choice"
+choices = ["8000", "16000", "22050", "32000", "44100", "48000", "88200", "96000", "176400", "192000"]
+default = "44100"
+hint = "Frequenze supportate: 8k, 16k, 22.05k, 32k, 44.1k, 48k, 88.2k, 96k, 176.4k, 192kHz"
+
+[[param]]
 id = "bits"
 label = "Profondit\u00e0 bit"
 flag = ""
@@ -15,20 +24,25 @@ hint = "Seleziona la profondit\u00e0 bit: 16/24/32-bit intero o 32/64-bit float"
 
 [[preset]]
 id = "cd_quality"
-label = "Qualit\u00e0 CD (16-bit)"
-values = { bits = "pcm_s16le" }
+label = "Qualit\u00e0 CD (16-bit, 44.1kHz)"
+values = { bits = "pcm_s16le", sample_rate = "44100" }
 
 [[preset]]
 id = "studio_24"
-label = "Studio 24-bit"
-values = { bits = "pcm_s24le" }
+label = "Studio (24-bit, 48kHz)"
+values = { bits = "pcm_s24le", sample_rate = "48000" }
 
 [[preset]]
 id = "float_32"
-label = "Float 32-bit"
-values = { bits = "pcm_f32le" }
+label = "Float 32-bit (48kHz)"
+values = { bits = "pcm_f32le", sample_rate = "48000" }
 
 [[preset]]
 id = "float_64"
-label = "Float 64-bit (Mastering)"
-values = { bits = "pcm_f64le" }
+label = "Float 64-bit (Mastering, 96kHz)"
+values = { bits = "pcm_f64le", sample_rate = "96000" }
+
+[[preset]]
+id = "high_res_192"
+label = "Alta risoluzione (24-bit, 192kHz)"
+values = { bits = "pcm_s24le", sample_rate = "192000" }

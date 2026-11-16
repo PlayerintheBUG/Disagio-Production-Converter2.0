@@ -4,6 +4,15 @@ label = "AAC"
 containers = ["mp4", "m4a", "mkv", "mov", "ts"]
 
 [[param]]
+id = "sample_rate"
+label = "Frequenza di campionamento"
+flag = "-ar"
+type = "choice"
+choices = ["8000", "16000", "22050", "32000", "44100", "48000", "88200", "96000", "192000"]
+default = "44100"
+hint = "Frequenze standard: 8k, 16k, 22.05k, 32k, 44.1k, 48k, 88.2k, 96k, 192kHz"
+
+[[param]]
 id = "bitrate"
 label = "Bitrate"
 flag = "-b"
@@ -15,14 +24,29 @@ hint = "Bitrate audio per canale stereo"
 [[preset]]
 id = "alta"
 label = "Alta qualità (256k)"
-values = { bitrate = "256k" }
+values = { bitrate = "256k", sample_rate = "44100" }
 
 [[preset]]
 id = "standard"
 label = "Standard (192k)"
-values = { bitrate = "192k" }
+values = { bitrate = "192k", sample_rate = "44100" }
 
 [[preset]]
 id = "bassa"
 label = "Compatta (128k)"
-values = { bitrate = "128k" }
+values = { bitrate = "128k", sample_rate = "44100" }
+
+[[preset]]
+id = "cd_quality"
+label = "Qualità CD (44.1kHz, 192k)"
+values = { bitrate = "192k", sample_rate = "44100" }
+
+[[preset]]
+id = "studio_48"
+label = "Studio (48kHz, 256k)"
+values = { bitrate = "256k", sample_rate = "48000" }
+
+[[preset]]
+id = "high_res_96"
+label = "Alta risoluzione (96kHz, 256k)"
+values = { bitrate = "256k", sample_rate = "96000" }

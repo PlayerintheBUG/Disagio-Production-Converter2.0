@@ -5,6 +5,15 @@ is_default = true
 containers = ["mka", "ogg", "opus", "mkv", "webm"]
 
 [[param]]
+id = "sample_rate"
+label = "Frequenza di campionamento"
+flag = "-ar"
+type = "choice"
+choices = ["8000", "16000", "24000", "48000", "96000"]
+default = "48000"
+hint = "Opus supporta: 8k, 16k, 24k, 48k, 96kHz"
+
+[[param]]
 id = "bitrate"
 label = "Bitrate"
 flag = "-b"
@@ -25,14 +34,24 @@ hint = "VBR ottimizza il bitrate in base alla complessità sonora"
 [[preset]]
 id = "alta"
 label = "Alta fedeltà (192k)"
-values = { bitrate = "192k", vbr = "on" }
+values = { bitrate = "192k", vbr = "on", sample_rate = "48000" }
 
 [[preset]]
 id = "standard"
 label = "Standard (128k)"
-values = { bitrate = "128k", vbr = "on" }
+values = { bitrate = "128k", vbr = "on", sample_rate = "48000" }
 
 [[preset]]
 id = "voce"
 label = "Voce / Podcast (64k)"
-values = { bitrate = "64k", vbr = "on" }
+values = { bitrate = "64k", vbr = "on", sample_rate = "16000" }
+
+[[preset]]
+id = "cd_quality"
+label = "Qualità CD (44.1kHz, 128k)"
+values = { bitrate = "128k", vbr = "on", sample_rate = "44100" }
+
+[[preset]]
+id = "high_res"
+label = "Alta risoluzione (96kHz, 192k)"
+values = { bitrate = "192k", vbr = "on", sample_rate = "96000" }
