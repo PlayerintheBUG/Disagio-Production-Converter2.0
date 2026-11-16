@@ -11,6 +11,7 @@ pub mod builtin_codecs;
 pub mod batch;
 pub mod cmdview;
 pub mod containers;
+pub mod size_estimator;
 
 /// Evita che i processi console figli (ffmpeg, ffprobe, python) aprano
 /// una finestra visibile su Windows quando lanciati dall'applicazione GUI.

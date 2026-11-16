@@ -4,6 +4,7 @@ use eframe::egui::{self, Color32, RichText};
 use ffgui_core::builder::CommandBuilder;
 use ffgui_core::cmdview::{build_compact, part_path, CompactCommand, InputSummary, TokenKind};
 use ffgui_core::runner::Runner;
+use ffgui_core::size_estimator::{estimate_job_size, EstimatedSize};
 use ffgui_core::validate::validate_job;
 use std::time::{Duration, Instant};
 
@@ -46,6 +47,12 @@ fn compute(app: &FfGuiApp) -> Option<Shown> {
         compact,
         exact,
     })
+}
+
+fn compute_size_estimate(app: &FfGuiApp) -> Option<EstimatedSize> {
+    let job = app.build_current_job()?;
+    let estimate = estimate_job_size(&job, &app.catalog, app.probe_result.as_ref());
+    Some(estimate)
 }
 
 fn kind_color(kind: TokenKind) -> Color32 {
@@ -218,6 +225,17 @@ pub fn render(ui: &mut egui::Ui, app: &mut FfGuiApp) {
                 }
             }
             ui.label(RichText::new(notes.join(" · ")).small().color(Color32::GRAY));
+
+        // Dimensione stimata del file di output
+        if let Some(estimate) = compute_size_estimate(app) {
+            if estimate.total.bytes > 0 {
+                ui.add_space(4.0);
+                ui.horizontal(|ui| {
+                    ui.colored_label(Color32::from_rgb(100, 200, 255), RichText::new("\u{2192} Dimensione stimata:").strong());
+                    ui.colored_label(Color32::from_rgb(200, 220, 255), RichText::new(estimate.format_compact()).monospace());
+                });
+            }
+        }
         }
 
         // Problemi di validazione
