@@ -49,9 +49,16 @@ fn compute(app: &FfGuiApp) -> Option<Shown> {
     })
 }
 
-fn compute_size_estimate(app: &FfGuiApp) -> Option<EstimatedSize> {
+fn compute_size_estimate(app: &mut FfGuiApp) -> Option<EstimatedSize> {
     let job = app.build_current_job()?;
     let estimate = estimate_job_size(&job, &app.catalog, app.probe_result.as_ref());
+    
+    // Force repaint if estimate changed
+    if app.last_size_estimate != Some(estimate) {
+        app.last_size_estimate = Some(estimate);
+        app.cmd_changed_at = Some(std::time::Instant::now());
+    }
+    
     Some(estimate)
 }
 

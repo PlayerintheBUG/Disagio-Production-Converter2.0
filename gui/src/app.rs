@@ -239,6 +239,9 @@ pub struct FfGuiApp {
     pub cmd_changed_flags: Vec<bool>,
     pub cmd_changed_at: Option<std::time::Instant>,
 
+    // Cache per la dimensione stimata (per forzare il ridisegno quando cambia)
+    pub last_size_estimate: Option<ffgui_core::size_estimator::EstimatedSize>,
+
     pub toast_message: Option<(String, std::time::Instant)>,
 
     // User Presets
@@ -357,6 +360,7 @@ impl FfGuiApp {
             cmd_prev_tokens: Vec::new(),
             cmd_changed_flags: Vec::new(),
             cmd_changed_at: None,
+            last_size_estimate: None,
             toast_message: None,
             user_presets,
             new_preset_name: String::new(),

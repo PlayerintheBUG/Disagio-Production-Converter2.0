@@ -9,7 +9,7 @@ use crate::probe::ProbeResult;
 use std::collections::HashMap;
 
 /// Dimensione stimata per tipologia di stream
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
 pub struct StreamSizeEstimate {
     /// Dimensione in bytes
     pub bytes: u64,
@@ -57,7 +57,7 @@ impl StreamSizeEstimate {
 }
 
 /// Dimensione stimata totale con suddivisione per tipo
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
 pub struct EstimatedSize {
     /// Dimensione stimata per stream video
     pub video: StreamSizeEstimate,
